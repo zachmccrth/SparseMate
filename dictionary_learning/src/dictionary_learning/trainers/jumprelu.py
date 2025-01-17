@@ -5,7 +5,7 @@ import torch.autograd as autograd
 from torch import nn
 from typing import Optional
 
-from dictionary_learning.src.dictionary_learning.dictionary import JumpReluAutoEncoder
+from dictionary_learning.dictionary import JumpReluAutoEncoder
 from ..trainers.trainer import (
     SAETrainer,
     get_lr_schedule,
