@@ -1,12 +1,14 @@
 import torch
 from torch.utils.data import DataLoader
-
+from loguru import logger
 from data_tools.puzzles import PuzzleDataset
 from dictionary_learning.buffer import LeelaActivationBuffer
 from leela_interp import Lc0sight
 from dictionary_learning import AutoEncoder
 from dictionary_learning.trainers import StandardTrainer
 from dictionary_learning.training import trainSAE
+
+logger.add("console", level="TRACE")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
