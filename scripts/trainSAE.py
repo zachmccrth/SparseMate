@@ -29,6 +29,7 @@ activation_buffer = LeelaActivationBuffer(
     submodule=submodule,
     d_submodule=activation_dim,
     device=str(device),
+    n_ctxs=10
 )
 
 trainer_cfg = {

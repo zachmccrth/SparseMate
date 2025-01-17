@@ -18,17 +18,18 @@ class LeelaActivationBuffer:
     Implements a buffer of activations. The buffer stores activations from a model,
     yields them in batches, and refreshes them when the buffer is less than half full.
     """
-    def __init__(self, 
-                 data, # generator which yields embedded board positions (right now torch.utils.data.Dataloader)
-                 model : Lc0sight,
-                 submodule, # submodule of the model from which to extract activations
-                 d_submodule=None, # submodule dimension; if None, try to detect automatically
-                 io='out', # can be 'in' or 'out'; whether to extract input or output activations
-                 n_ctxs=300, # approximate number of contexts to store in the buffer
-                 ctx_len=64, # length of each context
-                 refresh_batch_size=512, # size of batches in which to process the data when adding to buffer
-                 out_batch_size=8192, # size of batches in which to yield activations
-                 device='cpu', # device on which to store the activations
+
+    def __init__(self,
+                 data,  # generator which yields embedded board positions (right now torch.utils.data.Dataloader)
+                 model: Lc0sight,
+                 submodule,  # submodule of the model from which to extract activations
+                 d_submodule=None,  # submodule dimension; if None, try to detect automatically
+                 io='out',  # can be 'in' or 'out'; whether to extract input or output activations
+                 n_ctxs=300,  # approximate number of contexts to store in the buffer
+                 ctx_len=64,  # length of each context
+                 refresh_batch_size=30,  # size of batches in which to process the data when adding to buffer
+                 out_batch_size=10,  # size of batches in which to yield activations
+                 device='cpu',  # device on which to store the activations
                  remove_bos: bool = False,
                  ):
 
