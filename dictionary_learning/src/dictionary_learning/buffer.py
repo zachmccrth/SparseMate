@@ -3,6 +3,7 @@ from nnsight import LanguageModel
 import gc
 from tqdm import tqdm
 
+from leela_interp.core.nnsight import Lc0sight
 from .config import DEBUG
 
 if DEBUG:
@@ -11,19 +12,19 @@ else:
     tracer_kwargs = {'scan' : False, 'validate' : False}
 
 
-class ActivationBuffer:
+class LeelaActivationBuffer:
     """
     Implements a buffer of activations. The buffer stores activations from a model,
     yields them in batches, and refreshes them when the buffer is less than half full.
     """
     def __init__(self, 
                  data, # generator which yields text data
-                 model : LanguageModel, # LanguageModel from which to extract activations
+                 model : Lc0sight, # LanguageModel from which to extract activations
                  submodule, # submodule of the model from which to extract activations
                  d_submodule=None, # submodule dimension; if None, try to detect automatically
                  io='out', # can be 'in' or 'out'; whether to extract input or output activations
-                 n_ctxs=3e4, # approximate number of contexts to store in the buffer
-                 ctx_len=128, # length of each context
+                 n_ctxs=300, # approximate number of contexts to store in the buffer
+                 ctx_len=64, # length of each context
                  refresh_batch_size=512, # size of batches in which to process the data when adding to buffer
                  out_batch_size=8192, # size of batches in which to yield activations
                  device='cpu', # device on which to store the activations
@@ -130,7 +131,7 @@ class ActivationBuffer:
 
                     self.submodule.output.stop()
             attn_mask = input.value[1]["attention_mask"]
-            hidden_states = hidden_states.value
+            hidden_states = hidden_states.value[0]
             if isinstance(hidden_states, tuple):
                 hidden_states = hidden_states[0]
             if self.remove_bos:
