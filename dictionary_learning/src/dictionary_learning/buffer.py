@@ -2,6 +2,7 @@ import torch as t
 from nnsight import LanguageModel
 import gc
 from tqdm import tqdm
+from loguru import logger
 
 from leela_interp.core.nnsight import Lc0sight
 from .config import DEBUG
@@ -9,7 +10,7 @@ from .config import DEBUG
 if DEBUG:
     tracer_kwargs = {'scan' : True, 'validate' : True}
 else:
-    tracer_kwargs = {'scan' : False, 'validate' : False}
+    tracer_kwargs = {}
 
 
 class LeelaActivationBuffer:
@@ -18,8 +19,8 @@ class LeelaActivationBuffer:
     yields them in batches, and refreshes them when the buffer is less than half full.
     """
     def __init__(self, 
-                 data, # generator which yields text data
-                 model : Lc0sight, # LanguageModel from which to extract activations
+                 data, # generator which yields embedded board positions (right now torch.utils.data.Dataloader)
+                 model : Lc0sight,
                  submodule, # submodule of the model from which to extract activations
                  d_submodule=None, # submodule dimension; if None, try to detect automatically
                  io='out', # can be 'in' or 'out'; whether to extract input or output activations
@@ -76,7 +77,7 @@ class LeelaActivationBuffer:
             self.read[idxs] = True
             return self.activations[idxs]
     
-    def text_batch(self, batch_size=None):
+    def get_batch_boards(self, batch_size=None):
         """
         Return a list of text
         """
@@ -88,18 +89,15 @@ class LeelaActivationBuffer:
             ]
         except StopIteration:
             raise StopIteration("End of data stream reached")
-    
+
+    #TODO remove tokenizer (PuzzleDataset already tokenizes boards)
     def tokenized_batch(self, batch_size=None):
         """
         Return a batch of tokenized inputs.
         """
-        texts = self.text_batch(batch_size=batch_size)
+        boards = self.get_batch_boards(batch_size=batch_size)
         return self.model.tokenizer(
-            texts,
-            return_tensors='pt',
-            max_length=self.ctx_len,
-            padding=True,
-            truncation=True
+            boards
         )
 
     def refresh(self):
@@ -119,7 +117,7 @@ class LeelaActivationBuffer:
         while current_idx < self.activation_buffer_size:
             with t.no_grad():
                 with self.model.trace(
-                    self.text_batch(),
+                    self.get_batch_boards(),
                     **tracer_kwargs,
                     invoker_args={"truncation": True, "max_length": self.ctx_len},
                 ):
@@ -130,14 +128,11 @@ class LeelaActivationBuffer:
                     input = self.model.inputs.save()
 
                     self.submodule.output.stop()
-            attn_mask = input.value[1]["attention_mask"]
             hidden_states = hidden_states.value[0]
             if isinstance(hidden_states, tuple):
                 hidden_states = hidden_states[0]
             if self.remove_bos:
                 hidden_states = hidden_states[:, 1:, :]
-                attn_mask = attn_mask[:, 1:]
-            hidden_states = hidden_states[attn_mask != 0]
 
             remaining_space = self.activation_buffer_size - current_idx
             assert remaining_space > 0
