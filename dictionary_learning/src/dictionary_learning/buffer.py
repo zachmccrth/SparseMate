@@ -137,7 +137,9 @@ class LeelaActivationBuffer:
                 hidden_states = hidden_states[0]
             if self.remove_bos:
                 hidden_states = hidden_states[:, 1:, :]
-            hidden_states = hidden_states.value[0]
+
+            #Flatten along the first dimension (flatten batches and boards together), we only need random residual encodings from now on
+            hidden_states = hidden_states.reshape(-1, 768)
             logger.trace(f"hidden_states shape {hidden_states.shape}")
 
             remaining_space = self.activation_buffer_size - current_idx
