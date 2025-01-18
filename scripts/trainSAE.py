@@ -1,14 +1,22 @@
+import sys
+import os
+
+# Add the main project directory to sys.path
+project_dir = "/home/zachary/PycharmProjects/SparseMate"
+sys.path.append(project_dir)
+
+
 import torch
 from torch.utils.data import DataLoader
 from loguru import logger
 from data_tools.puzzles import PuzzleDataset
-from dictionary_learning.buffer import LeelaActivationBuffer
+from dictionary_learning.buffer import LeelaActivationBuffer, LeelaImpActivationBuffer
 from leela_interp import Lc0sight
 from dictionary_learning import AutoEncoder
 from dictionary_learning.trainers import StandardTrainer
 from dictionary_learning.training import trainSAE
 
-logger.add("console", level="TRACE")
+# logger.add("training_logs", level="TRACE")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -23,13 +31,23 @@ puzzle_dataset: PuzzleDataset = PuzzleDataset("/home/zachary/PycharmProjects/Spa
 
 dataloader = DataLoader(puzzle_dataset, batch_size=None, batch_sampler=None)
 
-activation_buffer = LeelaActivationBuffer(
+data_len_in_boards = 1_200_000 # according to the paper, there are around 1.2 million boards
+
+boards_to_train_on = data_len_in_boards
+
+tokens_per_step = 100
+
+steps = (boards_to_train_on * 64)// tokens_per_step
+
+print(f"Training on {boards_to_train_on * 64:,} tokens in {steps:,} training steps")
+
+activation_buffer = LeelaImpActivationBuffer(
     data=iter(dataloader),
     model=lc0,
     submodule=submodule,
     d_submodule=activation_dim,
     device=str(device),
-    n_ctxs=10
+    out_batch_size= tokens_per_step,
 )
 
 trainer_cfg = {
@@ -38,7 +56,7 @@ trainer_cfg = {
     "activation_dim": activation_dim,
     "dict_size": dictionary_size,
     "lr": 1e-3,
-    "steps": 10_000,
+    "steps": steps,
     "layer": 6,
     "lm_name": "leela",
     "warmup_steps": 1000,
@@ -49,7 +67,7 @@ trainer_cfg = {
 ae = trainSAE(
     data=activation_buffer,
     trainer_configs=[trainer_cfg],
-    steps=10_000,
+    steps=steps,
     save_dir='save_dir',
     device=str(device),
 )
