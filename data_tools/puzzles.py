@@ -1,5 +1,5 @@
 import itertools
-from typing import List, Iterable
+from typing import Iterable
 
 import numpy as np
 import torch
