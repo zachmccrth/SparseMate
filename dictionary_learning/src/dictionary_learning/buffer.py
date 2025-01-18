@@ -4,7 +4,8 @@ import gc
 from tqdm import tqdm
 from loguru import logger
 
-from leela_interp.core.nnsight import Lc0sight
+from leela_interp.core.leela_board import LeelaBoard
+from leela_interp.core.leela_nnsight import Lc0sight
 from .config import DEBUG
 
 if DEBUG:

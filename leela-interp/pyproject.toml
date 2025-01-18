@@ -17,7 +17,7 @@ dependencies = [
     "torch",
     "tqdm",
     "matplotlib",
-    "nnsight==0.2.*",
+    "nnsight==0.3.7",
     "onnx2torch",
     "pandas",
     "nbformat",

@@ -10,7 +10,7 @@ import zarr
 from einops import rearrange
 from leela_interp.core.lc0 import Lc0Model
 from leela_interp.core.leela_board import LeelaBoard
-from leela_interp.core.nnsight import Lc0sight
+from leela_interp.core.leela_nnsight import Lc0sight
 
 
 class ActivationCache:

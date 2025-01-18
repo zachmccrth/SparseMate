@@ -10,7 +10,7 @@ import pandas as pd
 from .core.iceberg_board import IcebergBoard, palette
 from .core.lc0 import Lc0Model
 from .core.leela_board import LeelaBoard
-from .core.nnsight import Lc0sight
+from .core.leela_nnsight import Lc0sight
 from .tools import patching
 from .tools.activations import ActivationCache
 from .tools.play import get_lc0_pv_probabilities
