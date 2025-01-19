@@ -3,6 +3,8 @@ Training dictionaries
 """
 
 import json
+
+import torch
 import torch.multiprocessing as mp
 import os
 from queue import Empty
@@ -235,6 +237,7 @@ def trainSAE(
                     if normalize_activations:
                         trainer.ae.scale_biases(1 / norm_factor)
 
+        torch.set_float32_matmul_precision('medium')
         # training
         for trainer in trainers:
             with autocast_context:
@@ -254,3 +257,5 @@ def trainSAE(
             queue.put("DONE")
         for process in wandb_processes:
             process.join()
+
+    return trainers[0].get_losses()

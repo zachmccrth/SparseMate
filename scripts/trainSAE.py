@@ -1,5 +1,6 @@
 import sys
-import os
+
+import numpy as np
 
 # Add the main project directory to sys.path
 project_dir = "/home/zachary/PycharmProjects/SparseMate"
@@ -64,10 +65,54 @@ trainer_cfg = {
 }
 
 # train the sparse autoencoder (SAE)
-ae = trainSAE(
+losses, recon, l1, l1_scaled,  sparsity = trainSAE(
     data=activation_buffer,
     trainer_configs=[trainer_cfg],
     steps=steps,
     save_dir='save_dir',
     device=str(device),
 )
+
+import matplotlib.pyplot as plt
+start_plots = 1000
+plt.plot(losses[start_plots:])
+plt.title('loss')
+plt.xlabel('steps')
+plt.ylabel('loss')
+plt.savefig("losses.png")
+plt.show()
+plt.close()
+
+plt.plot(recon[start_plots:])
+plt.title('reconstruction')
+plt.xlabel('steps')
+plt.ylabel('loss')
+plt.savefig("reconstruction.png")
+plt.show()
+plt.close()
+
+plt.plot(l1[start_plots:])
+plt.title('L1 Sparsity Loss')
+plt.xlabel('steps')
+plt.ylabel('sparsity loss')
+plt.savefig("sparsity_loss.png")
+plt.show()
+plt.close()
+
+plt.plot(l1_scaled[start_plots:])
+plt.title('L1 Sparsity Loss Scaled')
+plt.xlabel('steps')
+plt.ylabel('sparsity loss')
+plt.savefig("l1_loss.png")
+plt.show()
+plt.close()
+
+plt.plot(sparsity[start_plots:])
+plt.title('Sparsity')
+plt.xlabel('steps')
+plt.ylabel('average number of activations per feature')
+plt.savefig("sparsity.png")
+plt.show()
+
+print(f"Final Sparsity: {np.mean(sparsity[-1000:])}")
+print(f"Final Reconstruction Loss: {np.mean(recon[-1000:])}")
