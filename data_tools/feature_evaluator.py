@@ -66,15 +66,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 lc0: Lc0sight = Lc0sight("/home/zachary/PycharmProjects/leela-interp/lc0.onnx", device=device)
 # load autoencoder
-ae = AutoEncoder.from_pretrained("/home/zachary/PycharmProjects/SparseMate/save_dir/trainer_0/ae.pt", device=device)
+ae = AutoEncoder.from_pretrained("/home/zachary/PycharmProjects/SparseMate/scripts/save_dir/lichess_puzzles_epoch_1_v2/ae.pt", device=device)
+layer = 6
 
-# Train the SAE
-submodule = lc0.residual_stream(6) # layer 1 MLP
+submodule = lc0.residual_stream(layer) # layer 1 MLP
 activation_dim = 768 # output dimension of the MLP
 dictionary_size = 16 * activation_dim
 
 
-boards_to_encode = 1000
+boards_to_encode = 10
 tokens_per_step = 64
 
 puzzle_dataset = PuzzleDataset("/home/zachary/PycharmProjects/SparseMate/datasets/lichess_db_puzzle.csv")
@@ -92,7 +92,8 @@ activation_buffer = BoardActivationBuffer(
 
 
 # Initialize SQLite database and create table
-conn = sqlite3.connect("activations.db")
+db_name = f"layer_{layer}.db"
+conn = sqlite3.connect(db_name)
 cursor = conn.cursor()
 
 # Create the table
@@ -108,15 +109,15 @@ conn.commit()
 
 # Loop through buffer and insert data into the database
 @profile
-def write_to_db(max, activation_buffer, threshold=0.0001):
+def write_to_db(db_name, max, activation_buffer, threshold=0.0001):
     # Initialize database
-    conn = sqlite3.connect("activations.db")
+    conn = sqlite3.connect(db_name)
     cursor = conn.cursor()
 
     # Batch insert data
     data_to_insert = []
     board_index = 0
-    for board, activations in tqdm(activation_buffer, total=max, unit="boards"):
+    for board, activations in tqdm(activation_buffer, total=max, unit=" boards"):
         # Encode the batch to get the tensor
         features: torch.Tensor = ae.encode(activations)
 
@@ -156,5 +157,5 @@ def write_to_db(max, activation_buffer, threshold=0.0001):
 
 
 
-write_to_db(boards_to_encode,activation_buffer)
+write_to_db(db_name,boards_to_encode,activation_buffer)
 

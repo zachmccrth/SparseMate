@@ -4,13 +4,16 @@ You'll usually use `LeelaBoard.plot()` instead of using `IcebergBoard` directly.
 You might need to add more fonts to the `FONTS` list if none of the current ones exist
 on your system.
 """
+import base64
 
 import chess
 import chess.svg
 import iceberg as ice
 import matplotlib
 import numpy as np
+import skia
 import torch
+from iceberg import Bounds
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 
@@ -24,6 +27,9 @@ FONTS = ["Monaco", "DejaVu Sans Mono"]
 def palette(
     values: np.ndarray, cmap="viridis", zero_center=False, upper_ratio: float = 1.0, pre_defined_max=None
 ):
+    """
+    Normalizes the values and turns into color hexes
+    """
     if not isinstance(values, np.ndarray):
         raise TypeError("values must be a numpy array")
     if not pre_defined_max is None:
@@ -32,10 +38,12 @@ def palette(
         max_val = max(abs(values.min()), abs(values.max()))
         norm = Normalize(vmin=-max_val, vmax=max_val)
     else:
+         # TODO change back (you better not forget)
         vmin = values.min()
         diff = values.max() - vmin
         total_range = diff / upper_ratio
-        norm = Normalize(vmin=vmin, vmax=vmin + total_range)
+        norm = Normalize(vmin=0, vmax=4)
+        # norm = Normalize(vmin=vmin, vmax=vmin + total_range)
     mappable = ScalarMappable(norm=norm, cmap=cmap)
     return [
         matplotlib.colors.to_hex(mappable.to_rgba(value)) for value in values
@@ -213,3 +221,29 @@ class IcebergBoard(ice.DrawableWithChild):
         if isinstance(square, str):
             square = chess.parse_square(square)
         return self._squares[square]
+
+    def render_to_base64(self):
+        # Get board bounds
+        bounds: Bounds = self.bounds
+        width = int(bounds.width)
+        height = int(bounds.height)
+
+        # Create Skia Surface
+        surface = skia.Surface(width, height)
+        canvas = surface.getCanvas()
+
+        # Draw the IcebergBoard onto the canvas
+        canvas.clear(skia.ColorWHITE)  # Optional background color
+        self.draw(canvas)
+
+        # Create an image snapshot of the rendered content
+        image = surface.makeImageSnapshot()
+
+        # Encode image as PNG data
+        png_data = image.encodeToData()
+        if png_data is None:
+            raise ValueError("Failed to encode image to PNG format.")
+
+        # Convert PNG data to base64
+        base64_image = base64.b64encode(png_data).decode('utf-8')
+        return base64_image
