@@ -3,6 +3,8 @@ Defines the dictionary classes
 """
 
 from abc import ABC, abstractmethod
+
+import torch
 import torch as t
 import torch.nn as nn
 import torch.nn.init as init
@@ -39,7 +41,6 @@ class Dictionary(ABC, nn.Module):
         """
         pass
 
-
 class AutoEncoder(Dictionary, nn.Module):
     """
     A one-layer autoencoder.
@@ -62,7 +63,7 @@ class AutoEncoder(Dictionary, nn.Module):
         self.decoder.weight = nn.Parameter(w.clone())
 
     def encode(self, x):
-        return nn.ReLU()(self.encoder(x - self.bias))
+        return nn.LeakyReLU(1e-3)(self.encoder(x - self.bias))
 
     def decode(self, f):
         return self.decoder(f) + self.bias
