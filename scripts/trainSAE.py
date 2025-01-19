@@ -6,12 +6,28 @@ import numpy as np
 project_dir = "/home/zachary/PycharmProjects/SparseMate"
 sys.path.append(project_dir)
 
+# Train the SAE
+layer = 6
+
+DATA_LEN_IN_BOARDS = 1_200_000 # according to the paper, there are around 1.2 million boards
+
+boards_to_train_on = DATA_LEN_IN_BOARDS // 20
+
+tokens_per_step = 100
+
+steps = (boards_to_train_on * 64)// tokens_per_step
+
+sparsity_warmup_steps = steps // 1.2
+
+print(f"Training on {boards_to_train_on * 64:,} tokens ({boards_to_train_on:,} boards) in {steps:,} training steps")
+print(f"Estimated time: {(boards_to_train_on * 64 / 9_500)/60:0.2f} minutes")
+
+assert steps >= sparsity_warmup_steps
 
 import torch
 from torch.utils.data import DataLoader
-from loguru import logger
 from data_tools.puzzles import PuzzleDataset
-from dictionary_learning.buffer import LeelaActivationBuffer, LeelaImpActivationBuffer
+from dictionary_learning.buffer import  LeelaImpActivationBuffer
 from leela_interp import Lc0sight
 from dictionary_learning import AutoEncoder
 from dictionary_learning.trainers import StandardTrainer
@@ -19,12 +35,12 @@ from dictionary_learning.training import trainSAE
 
 # logger.add("training_logs", level="TRACE")
 
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 lc0: Lc0sight = Lc0sight("/home/zachary/PycharmProjects/leela-interp/lc0.onnx", device=device)
 
-# Train the SAE
-submodule = lc0.residual_stream(6) # layer 1 MLP
+submodule = lc0.residual_stream(layer) # layer 1 MLP
 activation_dim = 768 # output dimension of the MLP
 dictionary_size = 16 * activation_dim
 
@@ -32,15 +48,6 @@ puzzle_dataset: PuzzleDataset = PuzzleDataset("/home/zachary/PycharmProjects/Spa
 
 dataloader = DataLoader(puzzle_dataset, batch_size=None, batch_sampler=None)
 
-data_len_in_boards = 1_200_000 # according to the paper, there are around 1.2 million boards
-
-boards_to_train_on = data_len_in_boards
-
-tokens_per_step = 100
-
-steps = (boards_to_train_on * 64)// tokens_per_step
-
-print(f"Training on {boards_to_train_on * 64:,} tokens in {steps:,} training steps")
 
 activation_buffer = LeelaImpActivationBuffer(
     data=iter(dataloader),
@@ -56,12 +63,15 @@ trainer_cfg = {
     "dict_class": AutoEncoder,
     "activation_dim": activation_dim,
     "dict_size": dictionary_size,
-    "lr": 1e-3,
+    "lr": 1e-4,
+    "l1_penalty": 0.01,
     "steps": steps,
-    "layer": 6,
+    "layer": layer,
     "lm_name": "leela",
+    #Note, this does nothing for the standard trainer
     "warmup_steps": 1000,
-    "sparsity_warmup_steps": 5000,
+    # This does tho
+    "sparsity_warmup_steps": sparsity_warmup_steps,
 }
 
 # train the sparse autoencoder (SAE)
