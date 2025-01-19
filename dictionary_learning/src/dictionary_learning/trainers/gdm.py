@@ -6,7 +6,7 @@ import torch as t
 from typing import Optional
 
 from ..trainers.trainer import SAETrainer, get_lr_schedule, get_sparsity_warmup_fn, ConstrainedAdam
-from dictionary_learning.src.dictionary_learning.dictionary import GatedAutoEncoder
+from dictionary_learning.dictionary import GatedAutoEncoder
 from collections import namedtuple
 
 class GatedSAETrainer(SAETrainer):

@@ -191,7 +191,14 @@ def trainSAE(
             # Verify that all autoencoders have a scale_biases method
             trainer.ae.scale_biases(1.0)
 
-    for step, act in enumerate(tqdm(data, total=steps)):
+
+    tokens_per_step = 1 if data.OUT_BATCH_SIZE_TOKENS is None else data.OUT_BATCH_SIZE_TOKENS
+    if tokens_per_step == 1:
+        unit = "it"
+    else:
+        unit = "tokens"
+
+    for step, act in enumerate(tqdm(data, total=steps, unit=unit, unit_scale=tokens_per_step, smoothing=0.7)):
 
         act = act.to(dtype=autocast_dtype)
 

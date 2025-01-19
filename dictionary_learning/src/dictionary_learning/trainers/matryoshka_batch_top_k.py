@@ -4,7 +4,7 @@ from collections import namedtuple
 from typing import Optional
 from math import isclose
 
-from dictionary_learning.src.dictionary_learning.dictionary import Dictionary
+from dictionary_learning.dictionary import Dictionary
 from ..trainers.trainer import (
     SAETrainer,
     get_lr_schedule,

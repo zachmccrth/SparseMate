@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Feature Heatmaps</title>
+</head>
+<body>
+    <h1>Chess Feature Heatmaps</h1>
+    <label for="features">Select Feature:</label>
+    <select id="features">
+        {% for feature in features %}
+            <option value="{{ feature }}">{{ feature }}</option>
+        {% endfor %}
+    </select>
+    <button onclick="generateHeatmap()">Generate Heatmap</button>
+    <div id="heatmaps"></div>
+    <script>
+        async function generateHeatmap() {
+            const featureId = document.getElementById('features').value;
+            const response = await fetch('/heatmap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ feature_id: featureId })
+            });
+            const data = await response.json();
+            const heatmapsDiv = document.getElementById('heatmaps');
+            heatmapsDiv.innerHTML = '';
+            data.heatmaps.forEach(img => {
+                const imgElement = document.createElement('img');
+                imgElement.src = 'data:image/png;base64,' + img;
+                imgElement.style.margin = '10px';
+                heatmapsDiv.appendChild(imgElement);
+            });
+        }
+    </script>
+</body>
+</html>

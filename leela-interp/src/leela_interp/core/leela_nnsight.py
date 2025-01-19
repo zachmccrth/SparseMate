@@ -22,6 +22,8 @@ class Lc0sight(NNsight):
         model = Lc0Model(onnx_model_path=path, device=device)
         super().__init__(model)
         self._layers = [{} for _ in range(self._model.N_LAYERS)]
+        #TODO make dynamic
+        self.dtype = torch.float32
         layer_names = [f"encoder{i}" for i in range(self._model.N_LAYERS)]
         for name, _ in model.named_modules():
             if name == "_lc0_model" or name == "":
@@ -120,3 +122,6 @@ class Lc0sight(NNsight):
         This is multiplied with the QK matrix to get `headwise_attention_output`.
         """
         return self.layers[layer]["mha/V/transpose"]
+
+    def tokenizer(self, boards):
+        return self._model.make_inputs(boards)

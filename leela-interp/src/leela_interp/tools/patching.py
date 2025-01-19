@@ -6,7 +6,7 @@ import torch
 import tqdm
 from einops import rearrange
 from leela_interp.core.leela_board import LeelaBoard
-from leela_interp.core.nnsight import Lc0sight
+from leela_interp.core.leela_nnsight import Lc0sight
 
 
 def get_move_probs(
