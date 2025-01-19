@@ -22,11 +22,13 @@ FONTS = ["Monaco", "DejaVu Sans Mono"]
 
 
 def palette(
-    values: np.ndarray, cmap="viridis", zero_center=False, upper_ratio: float = 1.0
+    values: np.ndarray, cmap="viridis", zero_center=False, upper_ratio: float = 1.0, pre_defined_max=None
 ):
     if not isinstance(values, np.ndarray):
         raise TypeError("values must be a numpy array")
-    if zero_center:
+    if not pre_defined_max is None:
+        norm=Normalize(vmin=0.0, vmax=pre_defined_max)
+    elif zero_center:
         max_val = max(abs(values.min()), abs(values.max()))
         norm = Normalize(vmin=-max_val, vmax=max_val)
     else:
@@ -58,6 +60,7 @@ class IcebergBoard(ice.DrawableWithChild):
     arrows: dict[str, str] | None = None
     attn_map: np.ndarray | torch.Tensor | None = None
     show_lastmove: bool = True
+    pre_defined_max: float | None = None
 
     def setup(self):
         fill = {}
@@ -70,6 +73,7 @@ class IcebergBoard(ice.DrawableWithChild):
                         np.array(list(self.heatmap.values())),
                         cmap=self.cmap,
                         zero_center=self.zero_center,
+                        pre_defined_max=self.pre_defined_max
                     )
                 else:
                     colormap_values = [
@@ -89,7 +93,7 @@ class IcebergBoard(ice.DrawableWithChild):
                 assert self.heatmap.shape == (64,)
                 if self.mappable is None:
                     colormap_values, mappable = palette(
-                        self.heatmap, cmap=self.cmap, zero_center=self.zero_center
+                        self.heatmap, cmap=self.cmap, zero_center=self.zero_center, pre_defined_max=self.pre_defined_max
                     )
                 else:
                     colormap_values = [

@@ -96,6 +96,7 @@ class LeelaBoard:
         arrows: dict[str, str] | None = None,
         attn_map: torch.Tensor | np.ndarray | None = None,
         show_lastmove: bool = True,
+        pre_defined_max: float | None = None,
     ):
         return IcebergBoard(
             board=self.pc_board,
@@ -109,6 +110,7 @@ class LeelaBoard:
             arrows=arrows,
             attn_map=attn_map,
             show_lastmove=show_lastmove,
+            pre_defined_max=pre_defined_max
         )
 
     @classmethod
