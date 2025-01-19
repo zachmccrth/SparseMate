@@ -120,7 +120,7 @@ class StandardTrainer(SAETrainer):
         x_hat, f = self.ae(x, output_features=True)
         # l2_loss = t.linalg.norm(x - x_hat, dim=-1).mean()
         recon_loss = (x - x_hat).pow(2).sum(dim=-1).mean()
-        l1_loss = f.norm(p=1, dim=-1).mean()
+        modified_l1_loss = (f.abs().matmul(self.ae.decoder.weight.norm(p=2,dim=0))).mean()
 
         if self.steps_since_active is not None:
             # update steps_since_active
@@ -128,12 +128,12 @@ class StandardTrainer(SAETrainer):
             self.steps_since_active[deads] += 1
             self.steps_since_active[~deads] = 0
 
-        loss = recon_loss + self.l1_penalty * sparsity_scale * l1_loss
+        loss = recon_loss + self.l1_penalty * sparsity_scale * modified_l1_loss
 
         self.losses[step] = float(loss)
         self.recon_loss[step] = float(recon_loss)
-        self.l1_loss_scaled[step] = float(self.l1_penalty * sparsity_scale * l1_loss)
-        self.l1_loss[step] = float(self.l1_penalty * l1_loss)
+        self.l1_loss_scaled[step] = float(self.l1_penalty * sparsity_scale * modified_l1_loss)
+        self.l1_loss[step] = float(self.l1_penalty * modified_l1_loss)
         threshold = 1e-5  # threshold
         self.sparsity_score[step] = (f.abs() > threshold).float().sum(dim = 0).mean()
 
