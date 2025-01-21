@@ -33,8 +33,6 @@ class StandardTrainer(SAETrainer):
     ):
         super().__init__(seed)
 
-        self.l1_loss_scaled = np.zeros(steps)
-        self.sparsity_score = np.empty(steps)
         assert layer is not None and lm_name is not None
         self.layer = layer
         self.lm_name = lm_name
@@ -54,9 +52,6 @@ class StandardTrainer(SAETrainer):
         self.steps = steps
         self.decay_start = decay_start
         self.wandb_name = wandb_name
-        self.losses = np.empty(steps)
-        self.recon_loss = np.empty(steps)
-        self.l1_loss = np.empty(steps)
 
         if device is None:
             self.device = 'cuda' if t.cuda.is_available() else 'cpu'
@@ -118,7 +113,7 @@ class StandardTrainer(SAETrainer):
         sparsity_scale = self.sparsity_warmup_fn(step)
 
         x_hat, f = self.ae(x, output_features=True)
-        # l2_loss = t.linalg.norm(x - x_hat, dim=-1).mean()
+        l2_loss = t.linalg.norm(x - x_hat, dim=-1).mean()
         recon_loss = (x - x_hat).pow(2).sum(dim=-1).mean()
         modified_l1_loss = (f.abs().matmul(self.ae.decoder.weight.norm(p=2,dim=0))).mean()
 
@@ -130,26 +125,18 @@ class StandardTrainer(SAETrainer):
 
         loss = recon_loss + self.l1_penalty * sparsity_scale * modified_l1_loss
 
-        self.losses[step] = float(loss)
-        self.recon_loss[step] = float(recon_loss)
-        self.l1_loss_scaled[step] = float(self.l1_penalty * sparsity_scale * modified_l1_loss)
-        self.l1_loss[step] = float(self.l1_penalty * modified_l1_loss)
-        threshold = 1e-5  # threshold
-        self.sparsity_score[step] = (f.abs() > threshold).float().sum(dim = 0).mean()
-
-        return loss
-        # if not logging:
-        #     return loss
-        # else:
-        #     return namedtuple('LossLog', ['x', 'x_hat', 'f', 'losses'])(
-        #         x, x_hat, f,
-        #         {
-        #             'l2_loss' : l2_loss.item(),
-        #             'mse_loss' : recon_loss.item(),
-        #             'sparsity_loss' : modified_l1_loss.item(),
-        #             'loss' : loss.item()
-        #         }
-        #     )
+        if not logging:
+            return loss
+        else:
+            return namedtuple('LossLog', ['x', 'x_hat', 'f', 'losses'])(
+                x, x_hat, f,
+                {
+                    'l2_loss' : l2_loss.item(),
+                    'mse_loss' : recon_loss.item(),
+                    'sparsity_loss' : modified_l1_loss.item(),
+                    'loss' : loss.item()
+                }
+            )
 
     def update(self, step, activations):
         activations = activations.to(self.device)
@@ -162,9 +149,6 @@ class StandardTrainer(SAETrainer):
 
         if self.resample_steps is not None and step % self.resample_steps == 0:
             self.resample_neurons(self.steps_since_active > self.resample_steps / 2, activations)
-
-    def get_losses(self):
-        return self.losses, self.recon_loss, self.l1_loss, self.l1_loss_scaled, self.sparsity_score
 
     @property
     def config(self):

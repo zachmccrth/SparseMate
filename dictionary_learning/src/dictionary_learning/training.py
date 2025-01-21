@@ -258,4 +258,4 @@ def trainSAE(
         for process in wandb_processes:
             process.join()
 
-    return trainers[0].get_losses()
+    return trainers[0].ae

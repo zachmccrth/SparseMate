@@ -1,6 +1,9 @@
+from datetime import datetime
 import sys
 
 import numpy as np
+
+from dictionary_learning.dictionary import JumpReluAutoEncoder
 
 # Add the main project directory to sys.path
 project_dir = "/home/zachary/PycharmProjects/SparseMate"
@@ -11,18 +14,21 @@ layer = 6
 
 DATA_LEN_IN_BOARDS = 1_200_000 # according to the paper, there are around 1.2 million boards
 
-boards_to_train_on = DATA_LEN_IN_BOARDS // 20
+buffer_size_boards = 10_000
 
-tokens_per_step = 100
+boards_to_train_on = (buffer_size_boards - 10) * 40
+
+tokens_per_step = 2000
 
 steps = (boards_to_train_on * 64)// tokens_per_step
 
-sparsity_warmup_steps = steps // 1.2
+sparsity_warmup_steps = 100
 
 print(f"Training on {boards_to_train_on * 64:,} tokens ({boards_to_train_on:,} boards) in {steps:,} training steps")
-print(f"Estimated time: {(boards_to_train_on * 64 / 9_500)/60:0.2f} minutes")
+print(f"Estimated time: {(boards_to_train_on * 64 / 9_000)/60:0.2f} minutes")
 
-assert steps >= sparsity_warmup_steps
+if steps < sparsity_warmup_steps:
+    raise AssertionError(f"Steps: {steps} is less than sparsity_warmup_steps: {sparsity_warmup_steps}.")
 
 import torch
 from torch.utils.data import DataLoader
@@ -30,10 +36,8 @@ from data_tools.puzzles import PuzzleDataset
 from dictionary_learning.buffer import  LeelaImpActivationBuffer
 from leela_interp import Lc0sight
 from dictionary_learning import AutoEncoder
-from dictionary_learning.trainers import StandardTrainer
+from dictionary_learning.trainers import StandardTrainer, JumpReluTrainer
 from dictionary_learning.training import trainSAE
-
-# logger.add("training_logs", level="TRACE")
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -56,11 +60,16 @@ activation_buffer = LeelaImpActivationBuffer(
     d_submodule=activation_dim,
     device=str(device),
     out_batch_size= tokens_per_step,
+    n_ctxs=buffer_size_boards
 )
+
+trainer = JumpReluTrainer
 
 trainer_cfg = {
     "trainer": StandardTrainer,
     "dict_class": AutoEncoder,
+    "trainer": trainer,
+    "dict_class": JumpReluAutoEncoder,
     "activation_dim": activation_dim,
     "dict_size": dictionary_size,
     "lr": 1e-4,
@@ -68,61 +77,21 @@ trainer_cfg = {
     "steps": steps,
     "layer": layer,
     "lm_name": "leela",
-    #Note, this does nothing for the standard trainer
-    "warmup_steps": 1000,
-    # This does tho
+    "wandb_name": f"{trainer.__name__}_{datetime.now().strftime('%m%d_%H:%M')}",
+    "device": str(device),
+    "target_l0": 40,
     "sparsity_warmup_steps": sparsity_warmup_steps,
 }
 
 # train the sparse autoencoder (SAE)
-losses, recon, l1, l1_scaled,  sparsity = trainSAE(
+ae= trainSAE(
     data=activation_buffer,
     trainer_configs=[trainer_cfg],
     steps=steps,
     save_dir='save_dir',
     device=str(device),
+    use_wandb=True,
+    wandb_project="SparseMate",
+    wandb_entity="zacharymccrth",
+    log_steps=500
 )
-
-import matplotlib.pyplot as plt
-start_plots = 1000
-plt.plot(losses[start_plots:])
-plt.title('loss')
-plt.xlabel('steps')
-plt.ylabel('loss')
-plt.savefig("losses.png")
-plt.show()
-plt.close()
-
-plt.plot(recon[start_plots:])
-plt.title('reconstruction')
-plt.xlabel('steps')
-plt.ylabel('loss')
-plt.savefig("reconstruction.png")
-plt.show()
-plt.close()
-
-plt.plot(l1[start_plots:])
-plt.title('L1 Sparsity Loss')
-plt.xlabel('steps')
-plt.ylabel('sparsity loss')
-plt.savefig("sparsity_loss.png")
-plt.show()
-plt.close()
-
-plt.plot(l1_scaled[start_plots:])
-plt.title('L1 Sparsity Loss Scaled')
-plt.xlabel('steps')
-plt.ylabel('sparsity loss')
-plt.savefig("l1_loss.png")
-plt.show()
-plt.close()
-
-plt.plot(sparsity[start_plots:])
-plt.title('Sparsity')
-plt.xlabel('steps')
-plt.ylabel('average number of activations per feature')
-plt.savefig("sparsity.png")
-plt.show()
-
-print(f"Final Sparsity: {np.mean(sparsity[-1000:])}")
-print(f"Final Reconstruction Loss: {np.mean(recon[-1000:])}")

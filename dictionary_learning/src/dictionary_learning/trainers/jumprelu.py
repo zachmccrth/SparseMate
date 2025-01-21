@@ -182,7 +182,7 @@ class JumpReluTrainer(nn.Module, SAETrainer):
                 recon,
                 f,
                 {
-                    "l2_loss": recon_loss.item(),
+                    "recon_loss": recon_loss.item(),
                     "loss": loss.item(),
                 },
             )
