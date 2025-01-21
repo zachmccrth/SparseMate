@@ -4,6 +4,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess Feature Heatmaps</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        #heatmaps {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .heatmap-item {
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .heatmap-item img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }
+
+        .fen {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 12px;
+            max-width: 100%;
+            color: #555;
+        }
+
+        .moves, .themes {
+            font-size: 12px;
+            color: #555;
+            margin-top: 5px;
+        }
+    </style>
 </head>
 <body>
     <h1>Chess Feature Heatmaps</h1>
@@ -14,8 +58,26 @@
         {% endfor %}
     </select>
     <button onclick="generateHeatmap()">Generate Heatmap</button>
+    <button onclick="navigateFeature(-1)">Previous Feature</button>
+    <button onclick="navigateFeature(1)">Next Feature</button>
     <div id="heatmaps"></div>
+
     <script>
+        let currentIndex = 0;
+        const features = Array.from(document.getElementById('features').options).map(opt => opt.value);
+
+        function updateFeatureSelection(index) {
+            if (index >= 0 && index < features.length) {
+                currentIndex = index;
+                document.getElementById('features').value = features[currentIndex];
+                generateHeatmap();
+            }
+        }
+
+        function navigateFeature(direction) {
+            updateFeatureSelection(currentIndex + direction);
+        }
+
         async function generateHeatmap() {
             const featureId = document.getElementById('features').value;
             const response = await fetch('/heatmap', {
@@ -26,13 +88,37 @@
             const data = await response.json();
             const heatmapsDiv = document.getElementById('heatmaps');
             heatmapsDiv.innerHTML = '';
-            data.heatmaps.forEach(img => {
+
+            data.heatmaps.forEach(item => {
+                const heatmapItem = document.createElement('div');
+                heatmapItem.className = 'heatmap-item';
+
+                const fenDiv = document.createElement('div');
+                fenDiv.className = 'fen';
+                fenDiv.textContent = `${item.fen}`;
+
                 const imgElement = document.createElement('img');
-                imgElement.src = 'data:image/png;base64,' + img;
-                imgElement.style.margin = '10px';
-                heatmapsDiv.appendChild(imgElement);
+                imgElement.src = 'data:image/png;base64,' + item.image;
+
+                const movesDiv = document.createElement('div');
+                movesDiv.textContent = `Moves: ${item.moves}`;
+
+                const themesDiv = document.createElement('div');
+                themesDiv.textContent = `Themes: ${item.themes}`;
+
+                heatmapItem.appendChild(fenDiv);
+                heatmapItem.appendChild(imgElement);
+                heatmapItem.appendChild(movesDiv);
+                heatmapItem.appendChild(themesDiv);
+                heatmapsDiv.appendChild(heatmapItem);
             });
         }
+
+
+        document.getElementById('features').addEventListener('change', () => {
+            currentIndex = features.indexOf(document.getElementById('features').value);
+            generateHeatmap();
+        });
     </script>
 </body>
 </html>

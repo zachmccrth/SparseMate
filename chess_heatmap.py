@@ -1,37 +1,36 @@
-import chess
+# Flask App Update
 from flask import Flask, render_template, request, jsonify
 import sqlite3
 import numpy as np
-
-
+import chess
 from leela_interp.core.iceberg_board import IcebergBoard
 from leela_interp.core.leela_board import LeelaBoard
 
-# Initialize Flask app
 app = Flask(__name__)
 
 # Database connection function
 def get_db_connection():
-    conn = sqlite3.connect('/home/zachary/PycharmProjects/SparseMate/data_tools/layer_6.db')
+    conn = sqlite3.connect('/home/zachary/PycharmProjects/SparseMate/data_tools/layer_6_recon.db')
     conn.row_factory = sqlite3.Row
+    return conn
+
+def get_puzzles_db():
+    conn = sqlite3.connect('identifier.sqlite')
     return conn
 
 # Route to serve the main page
 @app.route('/')
 def index():
-    # Fetch feature IDs to display as options
     conn = get_db_connection()
     features = conn.execute('SELECT DISTINCT feature FROM activations ORDER BY feature').fetchall()
     features = [row['feature'] for row in features]
     conn.close()
     return render_template('index.html', features=features)
 
-# Route to generate heatmap for a selected feature
+
 @app.route('/heatmap', methods=['POST'])
 def heatmap():
     feature_id = request.json['feature_id']
-
-    # Query database for activation values
     conn = get_db_connection()
     rows = conn.execute('''
         SELECT fen, sq, value 
@@ -41,12 +40,10 @@ def heatmap():
     ''', (feature_id,)).fetchall()
     conn.close()
 
-    # Process data to create a heatmap per board
     boards = {}
-
-
-
     fens_ordered = []
+
+    puzzle_db = get_puzzles_db()
 
     for row in rows:
         fen = row['fen']
@@ -62,28 +59,22 @@ def heatmap():
         idx = leela_board.sq2idx(square)
         boards[fen][idx] = value
 
-
-    # Generate heatmaps
     heatmap_images = []
-    idx = 0
+    max_value = max(boards[fens_ordered[0]])
 
-    for fen in fens_ordered:
-
-        board: chess.Board = chess.Board(fen)
-
+    for fen in fens_ordered[:10]:
+        board = chess.Board(fen)
         heatmap_data = boards[fen]
-        # heatmap_data = np.linspace(0, 4, num=64)
-        iceberg_board = IcebergBoard(board=board, heatmap=heatmap_data)
-
+        iceberg_board = IcebergBoard(board=board, heatmap=heatmap_data, pre_defined_max=max_value)
         image_base64 = iceberg_board.render_to_base64()
 
-        heatmap_images.append(image_base64)
+        if puzzle_db is not None:
+            puzzle_info = puzzle_db.execute("""
+            SELECT Moves, Themes FROM lichess_db_puzzle WHERE fen = ?""", (fen,)).fetchall()
 
-        idx += 1
-        if idx > 50:
-            break
+        heatmap_images.append({'fen': fen, 'image': image_base64, 'moves': puzzle_info[0][0], 'themes': puzzle_info[0][1] })
 
-
+    puzzle_db.close()
     return jsonify({'heatmaps': heatmap_images})
 
 if __name__ == '__main__':

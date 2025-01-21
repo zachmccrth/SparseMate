@@ -66,8 +66,6 @@ activation_buffer = LeelaImpActivationBuffer(
 trainer = JumpReluTrainer
 
 trainer_cfg = {
-    "trainer": StandardTrainer,
-    "dict_class": AutoEncoder,
     "trainer": trainer,
     "dict_class": JumpReluAutoEncoder,
     "activation_dim": activation_dim,
