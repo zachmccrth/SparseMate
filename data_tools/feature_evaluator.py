@@ -3,6 +3,9 @@ import sys
 
 import numpy as np
 
+from data_tools.bag_data import ChessBenchDataset
+from dictionary_learning.dictionary import JumpReluAutoEncoder, AttentionSeekingAutoEncoder
+
 # Add the main project directory to sys.path
 project_dir = "/home/zachary/PycharmProjects/SparseMate"
 sys.path.append(project_dir)
@@ -11,7 +14,6 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from data_tools.puzzles import PuzzleDataset
-from dictionary_learning import AutoEncoder
 from dictionary_learning.buffer import tracer_kwargs
 from leela_interp.core.leela_board import LeelaBoard
 from leela_interp.core.leela_nnsight import Lc0sight
@@ -21,7 +23,7 @@ import torch
 
 
 
-class BoardActivationBuffer():
+class BoardActivationBuffer:
     def __init__(self, data, model, submodule, d_submodule, device, size=20,):
         self.data = data
         self.transformer_model = model
@@ -77,7 +79,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 lc0: Lc0sight = Lc0sight("/home/zachary/PycharmProjects/leela-interp/lc0.onnx", device=device)
 # load autoencoder
-ae = AutoEncoder.from_pretrained("/home/zachary/PycharmProjects/SparseMate/scripts/save_dir/trainer_0/ae.pt", device=device)
+ae = AttentionSeekingAutoEncoder.from_pretrained("/home/zachary/PycharmProjects/SparseMate/scripts/save_dir/attentionseeking/ae.pt", device=device)
 layer = 6
 
 submodule = lc0.residual_stream(layer) # layer 1 MLP
@@ -85,12 +87,13 @@ activation_dim = 768 # output dimension of the MLP
 dictionary_size = 16 * activation_dim
 
 
-boards_to_encode = 1000
+boards_to_encode = 10000
 tokens_per_step = 64
 
-puzzle_dataset = PuzzleDataset("/home/zachary/PycharmProjects/SparseMate/datasets/lichess_db_puzzle.csv")
+# dataset = PuzzleDataset("/home/zachary/PycharmProjects/SparseMate/datasets/lichess_db_puzzle.csv")
+dataset = ChessBenchDataset()
 
-dataloader = DataLoader(puzzle_dataset, batch_size=None, batch_sampler=None)
+dataloader = DataLoader(dataset, batch_size=None, batch_sampler=None)
 
 #This is an iterator
 activation_buffer = BoardActivationBuffer(
@@ -104,7 +107,7 @@ activation_buffer = BoardActivationBuffer(
 
 
 # Initialize SQLite database and create table
-db_name = f"layer_{layer}_recon.db"
+db_name = f"layer_{layer}_attentionseeking_chessbench.db"
 conn = sqlite3.connect(db_name)
 cursor = conn.cursor()
 
@@ -180,5 +183,5 @@ def write_to_db(db_name, max, activation_buffer, threshold=0.0001):
 
 
 
-write_to_db(db_name,boards_to_encode,activation_buffer, threshold=0.01)
+write_to_db(db_name,boards_to_encode,activation_buffer, threshold=0.001)
 

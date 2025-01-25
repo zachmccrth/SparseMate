@@ -1,95 +1,94 @@
 from datetime import datetime
 import sys
 
-import numpy as np
+from torch.cpu.amp import autocast
 
-from dictionary_learning.dictionary import JumpReluAutoEncoder
+from dictionary_learning.trainers.attention_seeking import AttentionSeekingTrainer
 
-# Add the main project directory to sys.path
-project_dir = "/home/zachary/PycharmProjects/SparseMate"
-sys.path.append(project_dir)
+if __name__ == '__main__':
+    # Add the main project directory to sys.path
+    project_dir = "/home/zachary/PycharmProjects/SparseMate"
+    sys.path.append(project_dir)
 
-# Train the SAE
-layer = 6
+    # Train the SAE
+    layer = 6
 
-DATA_LEN_IN_BOARDS = 1_200_000 # according to the paper, there are around 1.2 million boards
+    DATA_LEN_IN_BOARDS = 1_200_000 # according to the paper, there are around 1.2 million boards
 
-buffer_size_boards = 10_000
+    buffer_size_boards = 4_000
 
-boards_to_train_on = (buffer_size_boards - 10) * 40
+    boards_to_train_on = buffer_size_boards * 2000
 
-tokens_per_step = 2000
+    tokens_per_step = 5000
 
-steps = (boards_to_train_on * 64)// tokens_per_step
+    steps = (boards_to_train_on * 64)// tokens_per_step
 
-sparsity_warmup_steps = 100
+    sparsity_warmup_steps = 1000
 
-print(f"Training on {boards_to_train_on * 64:,} tokens ({boards_to_train_on:,} boards) in {steps:,} training steps")
-print(f"Estimated time: {(boards_to_train_on * 64 / 9_000)/60:0.2f} minutes")
+    print(f"Training on {boards_to_train_on * 64:,} tokens ({boards_to_train_on:,} boards) in {steps:,} training steps")
+    print(f"Estimated time: {(boards_to_train_on * 64 / 29_000)/60:0.2f} minutes")
 
-if steps < sparsity_warmup_steps:
-    raise AssertionError(f"Steps: {steps} is less than sparsity_warmup_steps: {sparsity_warmup_steps}.")
+    if steps < sparsity_warmup_steps:
+        raise AssertionError(f"Steps: {steps} is less than sparsity_warmup_steps: {sparsity_warmup_steps}.")
 
-import torch
-from torch.utils.data import DataLoader
-from data_tools.puzzles import PuzzleDataset
-from dictionary_learning.buffer import  LeelaImpActivationBuffer
-from leela_interp import Lc0sight
-from dictionary_learning import AutoEncoder
-from dictionary_learning.trainers import StandardTrainer, JumpReluTrainer
-from dictionary_learning.training import trainSAE
+    import torch
+    from data_tools.bag_data import ChessBenchDataset
+    from dictionary_learning.dictionary import JumpReluAutoEncoder, AttentionSeekingAutoEncoder
+    from dictionary_learning.buffer import  LeelaImpActivationBuffer
+    from dictionary_learning.trainers import JumpReluTrainer
+    from dictionary_learning.training import trainSAE
+    import torch.multiprocessing as mp
 
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-lc0: Lc0sight = Lc0sight("/home/zachary/PycharmProjects/leela-interp/lc0.onnx", device=device)
-
-submodule = lc0.residual_stream(layer) # layer 1 MLP
-activation_dim = 768 # output dimension of the MLP
-dictionary_size = 16 * activation_dim
-
-puzzle_dataset: PuzzleDataset = PuzzleDataset("/home/zachary/PycharmProjects/SparseMate/datasets/lichess_db_puzzle.csv")
-
-dataloader = DataLoader(puzzle_dataset, batch_size=None, batch_sampler=None)
+    mp.set_start_method('spawn', force=True)  # Use spawn for CUDA compatibility
+    torch.set_float32_matmul_precision("high")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-activation_buffer = LeelaImpActivationBuffer(
-    data=iter(dataloader),
-    model=lc0,
-    submodule=submodule,
-    d_submodule=activation_dim,
-    device=str(device),
-    out_batch_size= tokens_per_step,
-    n_ctxs=buffer_size_boards
-)
+    activation_dim = 768 # output dimension of the MLP
+    dictionary_size = 8 * activation_dim
 
-trainer = JumpReluTrainer
+    dataset_class = ChessBenchDataset
 
-trainer_cfg = {
-    "trainer": trainer,
-    "dict_class": JumpReluAutoEncoder,
-    "activation_dim": activation_dim,
-    "dict_size": dictionary_size,
-    "lr": 1e-4,
-    "l1_penalty": 0.01,
-    "steps": steps,
-    "layer": layer,
-    "lm_name": "leela",
-    "wandb_name": f"{trainer.__name__}_{datetime.now().strftime('%m%d_%H:%M')}",
-    "device": str(device),
-    "target_l0": 40,
-    "sparsity_warmup_steps": sparsity_warmup_steps,
-}
 
-# train the sparse autoencoder (SAE)
-ae= trainSAE(
-    data=activation_buffer,
-    trainer_configs=[trainer_cfg],
-    steps=steps,
-    save_dir='save_dir',
-    device=str(device),
-    use_wandb=True,
-    wandb_project="SparseMate",
-    wandb_entity="zacharymccrth",
-    log_steps=500
-)
+    activation_buffer = LeelaImpActivationBuffer(
+        dataset_class=dataset_class,
+        onnx_model_path="/home/zachary/PycharmProjects/leela-interp/lc0.onnx",
+        d_submodule=activation_dim,
+        device=device,
+        out_batch_size= tokens_per_step,
+        n_ctxs=buffer_size_boards,
+        dtype = torch.float16
+    )
+
+    trainer = AttentionSeekingTrainer
+
+    trainer_cfg = {
+        "trainer": trainer,
+        "dict_class": AttentionSeekingAutoEncoder,
+        "activation_dim": activation_dim,
+        "dict_size": dictionary_size,
+        "steps": steps,
+        "layer": layer,
+        "lm_name": "leela",
+        "wandb_name": f"{trainer.__name__}_{datetime.now().strftime('%m%d_%H:%M')}",
+        "device": str(device),
+        "target_l0": 40,
+        "sparsity_warmup_steps": sparsity_warmup_steps,
+        "warmup_steps": sparsity_warmup_steps,
+        "sparsity_penalty" : 0.1,
+        # "batch_size": tokens_per_step,
+    }
+
+    # train the sparse autoencoder (SAE)
+    ae= trainSAE(
+        data=activation_buffer,
+        trainer_configs=[trainer_cfg],
+        steps=steps,
+        save_dir='save_dir',
+        device=str(device),
+        use_wandb=True,
+        wandb_project="SparseMate",
+        wandb_entity="zacharymccrth",
+        log_steps=10,
+        autocast_dtype=torch.float16,
+    )

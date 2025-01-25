@@ -69,7 +69,10 @@ def log_stats(
             # log parameters from training
             log.update({f"{k}": v.cpu().item() if isinstance(v, t.Tensor) else v for k, v in losslog.items()})
             log[f"l0"] = l0
+            # log["tokens"] = step * trainer.batch_size
             trainer_log = trainer.get_logging_parameters()
+            if trainer.last_grad_norm is not None:
+                trainer_log["grad_norm"] = trainer.last_grad_norm
             for name, value in trainer_log.items():
                 if isinstance(value, t.Tensor):
                     value = value.cpu().item()
@@ -141,7 +144,7 @@ def trainSAE(
     trainers = []
     for i, config in enumerate(trainer_configs):
         if "wandb_name" in config:
-            config["wandb_name"] = f"{config['wandb_name']}_trainer_{i}"
+            config["wandb_name"] = f"{config['wandb_name']}"
         trainer_class = config["trainer"]
         del config["trainer"]
         trainers.append(trainer_class(**config))

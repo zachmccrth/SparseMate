@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 # Database connection function
 def get_db_connection():
-    conn = sqlite3.connect('/home/zachary/PycharmProjects/SparseMate/data_tools/layer_6_recon.db')
+    conn = sqlite3.connect('/home/zachary/PycharmProjects/SparseMate/data_tools/layer_6_attentionseeking_smalld.db')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -62,7 +62,7 @@ def heatmap():
     heatmap_images = []
     max_value = max(boards[fens_ordered[0]])
 
-    for fen in fens_ordered[:10]:
+    for fen in fens_ordered[:50]:
         board = chess.Board(fen)
         heatmap_data = boards[fen]
         iceberg_board = IcebergBoard(board=board, heatmap=heatmap_data, pre_defined_max=max_value)
@@ -72,7 +72,13 @@ def heatmap():
             puzzle_info = puzzle_db.execute("""
             SELECT Moves, Themes FROM lichess_db_puzzle WHERE fen = ?""", (fen,)).fetchall()
 
-        heatmap_images.append({'fen': fen, 'image': image_base64, 'moves': puzzle_info[0][0], 'themes': puzzle_info[0][1] })
+
+        if len(puzzle_info) > 0:
+            heatmap_images.append({'fen': fen, 'image': image_base64, 'moves': puzzle_info[0][0], 'themes': puzzle_info[0][1] })
+        else:
+            heatmap_images.append({'fen': fen, 'image': image_base64})
+        puzzle_info = None
+
 
     puzzle_db.close()
     return jsonify({'heatmaps': heatmap_images})
