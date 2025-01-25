@@ -1,312 +1,198 @@
-from typing import List
-
-import torch
 import torch as t
-from nnsight import LanguageModel
-from loguru import logger
+from torch.utils.data import DataLoader
 
-from leela_interp.core.leela_board import LeelaBoard
-from leela_interp.core.leela_nnsight import Lc0sight
+from model_tools.truncated_leela import TruncatedModel
 from .config import DEBUG
+import torch.multiprocessing as mp
+import queue
+
 
 if DEBUG:
     tracer_kwargs = {'scan': True, 'validate': True}
 else:
     tracer_kwargs = {}
 
-
-class LeelaActivationBuffer:
+def _background_buffer_filler(
+        cfg,  # dictionary with config info
+        data_q: mp.Queue,
+        done_event: mp.Event,
+        device: t.device = t.device("cpu"),
+):
     """
-    Implements a buffer of activations. The buffer stores activations from a model,
-    yields them in batches, and refreshes them when the buffer is less than half full.
+    Runs in a background process.
+    Continuously fills a CPU backup buffer with fresh activations
+    and pushes them onto the data_q for the main process to consume.
     """
 
-    def __init__(self,
-                 data,  # generator which yields embedded board positions (right now torch.utils.data.Dataloader)
-                 model: Lc0sight,
-                 submodule,  # submodule of the model from which to extract activations
-                 d_submodule=None,  # submodule dimension; if None, try to detect automatically
-                 io='out',  # can be 'in' or 'out'; whether to extract input or output activations
-                 n_ctxs=300,  # approximate number of contexts to store in the buffer
-                 ctx_len=64,  # length of each context
-                 refresh_batch_size=64,  # size of batches in which to process the data when adding to buffer
-                 out_batch_size=10,  # size of batches in which to yield activations
-                 device='cpu',  # device on which to store the activations
-                 remove_bos: bool = False,
-                 ):
-
-        if io not in ['in', 'out']:
-            raise ValueError("io must be either 'in' or 'out'")
-
-        if d_submodule is None:
-            try:
-                if io == 'in':
-                    d_submodule = submodule.in_features
-                else:
-                    d_submodule = submodule.out_features
-            except:
-                raise ValueError("d_submodule cannot be inferred and must be specified directly")
-        self.activations = t.empty(0, d_submodule, device=device, dtype=model.dtype)
-        self.read = t.zeros(0).bool()
-
-        self.data = data
-        self.model = model
-        self.submodule = submodule
-        self.d_submodule = d_submodule
-        self.io = io
-        self.n_ctxs = n_ctxs
-        self.ctx_len = ctx_len
-        self.activation_buffer_size = n_ctxs * ctx_len
-        self.refresh_batch_size = refresh_batch_size
-        self.out_batch_size = out_batch_size
-        self.device = device
-        self.remove_bos = remove_bos
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        """
-        Return a batch of activations
-        """
-        with t.no_grad():
-            # if buffer is less than half full, refresh
-            # THIS ONE LINE IS SO FUCKING SLOW
-            if self.read.logical_not().count_nonzero() < self.activation_buffer_size // 2:
-                self.refresh()
-
-            # return a batch
-            unreads = (~self.read).nonzero().squeeze()
-            idxs = unreads[t.randperm(len(unreads), device=unreads.device)[:self.out_batch_size]]
-            self.read[idxs] = True
-            logger.trace(f"read {len(idxs)} activations with shape {self.activations[0].shape}")
-            return self.activations[idxs]
-
-    def get_batch_boards(self, batch_size=None):
-        """
-        Return a list of boards, size self.refresh_batch_size
-        """
-        if batch_size is None:
-            batch_size = self.refresh_batch_size
+    submodule = TruncatedModel(onnx_model_path=cfg['onnx_model_path'], device=device)
+    submodule.eval()  # Ensure it's in evaluation mode
+    dataset_class = cfg['dataset_class']
+    dataset = dataset_class()
+    dataloader = DataLoader(dataset, batch_size=None, batch_sampler=None)
+    data_generator = iter(dataloader)
+    while not done_event.is_set():
         try:
-            return [
-                next(self.data) for _ in range(batch_size)
-            ]
-        except StopIteration:
-            raise StopIteration("End of data stream reached")
-
-    def tokenized_batch(self, batch_size=None):
-        """
-        Return a batch of tokenized inputs.
-        """
-        boards = self.get_batch_boards(batch_size=batch_size)
-        return self.model.tokenizer(
-            boards
-        )
-
-    def refresh(self):
-        # This seems like it is fucking everything up
-        # gc.collect()
-        t.cuda.empty_cache()
-        self.activations = self.activations[~self.read]
-
-        current_idx = len(self.activations)
-        new_activations = t.empty(self.activation_buffer_size, self.d_submodule, device=self.device,
-                                  dtype=self.model.dtype)
-
-        new_activations[: len(self.activations)] = self.activations
-        self.activations = new_activations
-
-        # Optional progress bar when filling buffer. At larger models / buffer sizes (e.g. gemma-2-2b, 1M tokens on a 4090) this can take a couple minutes.
-        # pbar = tqdm(total=self.activation_buffer_size, initial=current_idx, desc="Refreshing activations")
-
-        while current_idx < self.activation_buffer_size:
-            with t.no_grad():
-                with self.model.trace(
-                        self.get_batch_boards(),
-                        **tracer_kwargs,
-                        invoker_args={"truncation": True, "max_length": self.ctx_len},
-                ):
-                    if self.io == "in":
-                        hidden_states = self.submodule.inputs[0].save()
-                    else:
-                        hidden_states = self.submodule.output.save()
-
-                    self.submodule.output.stop()
-
-            if isinstance(hidden_states, tuple):
-                hidden_states = hidden_states[0]
-            if self.remove_bos:
-                hidden_states = hidden_states[:, 1:, :]
-
-            #Flatten along the first dimension (flatten batches and boards together), we only need random residual encodings from now on
-            hidden_states = hidden_states.reshape(-1, 768)
-            logger.trace(f"hidden_states shape {hidden_states.shape}")
-
-            remaining_space = self.activation_buffer_size - current_idx
-            assert remaining_space > 0
-            hidden_states = hidden_states[:remaining_space]
-
-            logger.trace(
-                f"Moving hidden_states shape {hidden_states.shape} to {self.device} and setting activations with shape {self.activations.shape}")
-            self.activations[current_idx: current_idx + len(hidden_states)] = hidden_states.to(
-                self.device
+            # Create a fresh backup buffer on CPU:
+            backup_buffer = t.empty(
+                cfg['SIZE_OF_BUFFER_IN_TOKENS'],
+                cfg['d_submodule'],
+                dtype=cfg['dtype'],
+                device=device,
             )
-            current_idx += len(hidden_states)
 
-            # pbar.update(len(hidden_states))
+            idx = 0
+            while idx < cfg['SIZE_OF_BUFFER_IN_TOKENS']:
+                # 1) get next data from your generator
+                #    In a real scenario, you might need to handle StopIteration or break out.
+                boards = []
+                for _ in range(cfg['refresh_batch_size_boards']):
+                    boards.append(next(data_generator))
+                inputs = submodule.make_inputs(boards)
+                with t.no_grad():
+                    hidden_states = submodule(inputs)
 
-        # pbar.close()
-        self.read = t.zeros(len(self.activations), dtype=t.bool, device=self.device)
+                # Fill the backup_buffer
+                remaining_space = cfg['SIZE_OF_BUFFER_IN_TOKENS'] - idx
+                hidden_states = hidden_states[:remaining_space]
+                backup_buffer[idx: idx + len(hidden_states)] = hidden_states
+                idx += len(hidden_states)
 
-    @property
-    def config(self):
-        return {
-            'd_submodule': self.d_submodule,
-            'io': self.io,
-            'n_ctxs': self.n_ctxs,
-            'ctx_len': self.ctx_len,
-            'refresh_batch_size': self.refresh_batch_size,
-            'out_batch_size': self.out_batch_size,
-            'device': self.device
-        }
 
-    def close(self):
-        """
-        Close the text stream and the underlying compressed file.
-        """
-        self.text_stream.close()
+            # 3) Once the backup buffer is filled, put it in the queue
+            data_q.put(backup_buffer)
 
-class LeelaImpActivationBuffer():
+        except StopIteration:
+            # If your data generator is exhausted, you might signal the main process
+            print("Background filler: data exhausted.")
+            done_event.set()
+            break
+
+    print("Background filler process: done_event is set. Exiting.")
+
+
+class LeelaImpActivationBuffer:
     def __init__(self,
-                 data,  # generator which yields embedded board positions (right now torch.utils.data.Dataloader)
-                 model: Lc0sight, # an NNsight model, with a model.tokenizer() method
-                 submodule,  # submodule of the model from which to extract activations
-                 d_submodule=None,  # submodule dimension; if None, try to detect automatically
-                 io='out',  # can be 'in' or 'out'; whether to extract input or output activations
-                 n_ctxs=10000,  # size of buffer in boards
-                 refresh_batch_size=100,  # number of boards at a time to add to the buffer
-                 out_batch_size=10,  # size of token batches to output for training
-                 device='cpu',  # device on which to store the activations
+                 dataset_class,
+                 onnx_model_path,
+                 d_submodule=None,
+                 io='out',
+                 n_ctxs=10000,
+                 refresh_batch_size=100,
+                 out_batch_size=10,
+                 device=t.device("cpu"),
+                 dtype=t.float32,
                  ):
 
         if io not in ['in', 'out']:
             raise ValueError("io must be either 'in' or 'out'")
 
         if d_submodule is None:
-            try:
-                if io == 'in':
-                    d_submodule = submodule.in_features
-                else:
-                    d_submodule = submodule.out_features
-            except:
-                raise ValueError("d_submodule cannot be inferred and must be specified directly")
+            raise ValueError("d_submodule cannot be inferred and must be specified directly")
 
-        self.input_data_generator = data
-        self.transformer_model = model
-        self.submodule_to_probe = submodule
-        self.d_submodule = d_submodule
-        self.io = io
+        self.device = device
+        self.dtype = dtype
+
+
         self.size_of_buffer_in_boards = n_ctxs
         self.BOARD_SIZE = 64
         self.SIZE_OF_BUFFER_IN_TOKENS = n_ctxs * self.BOARD_SIZE
         self.refresh_batch_size_boards = refresh_batch_size
         self.OUT_BATCH_SIZE_TOKENS = out_batch_size
-        self.device = device
+        self.d_submodule = d_submodule
 
-        self.activation_buffer = t.empty(self.SIZE_OF_BUFFER_IN_TOKENS, d_submodule, device=device, dtype=model.dtype)
+        # The main, actively used activation buffer is on GPU (or whatever self.device is)
+        self.activation_buffer = t.empty(
+            self.SIZE_OF_BUFFER_IN_TOKENS, d_submodule,
+            device=self.device, dtype=self.dtype
+        )
+        self.backup_buffer = t.empty(
+            self.SIZE_OF_BUFFER_IN_TOKENS, d_submodule,
+            device=device, dtype=self.dtype
+        )
+
+
+
+
         self.current_token_idx = len(self.activation_buffer)
+
+        self.dataset_class = dataset_class
+
+        # We'll create a Multiprocessing Queue
+        self.data_q = mp.Queue(maxsize=2)  # keep small, e.g. 2, so we don't fill up memory
+        # We'll also use an Event to signal the worker to stop
+        self.done_event = mp.Event()
+
+        # Build a config dict to pass to the worker
+        self.cfg = dict(
+            SIZE_OF_BUFFER_IN_TOKENS=self.SIZE_OF_BUFFER_IN_TOKENS,
+            d_submodule=self.d_submodule,
+            dtype=self.dtype,
+            dataset_class=self.dataset_class,
+            BOARD_SIZE=self.BOARD_SIZE,
+            refresh_batch_size_boards=self.refresh_batch_size_boards,
+            onnx_model_path=onnx_model_path,
+        )
+
+        # Start the worker process
+        self.process = mp.Process(
+            target=_background_buffer_filler,
+            args=(self.cfg, self.data_q, self.done_event, self.device),
+        )
+        self.process.daemon = True
+        self.process.start()
 
     def __iter__(self):
         return self
 
     def __next__(self):
         """
-        Return a batch of activations
+        Return a batch of activations from the current activation_buffer.
+        If near the end, swap in a new buffer from the queue.
         """
         with t.no_grad():
-            # refresh buffer if empty
+            # If we are close to exhausting the current GPU buffer,
+            # swap in the next buffer from the queue (if available).
             if self.current_token_idx + self.OUT_BATCH_SIZE_TOKENS >= self.SIZE_OF_BUFFER_IN_TOKENS:
-                self.refresh()
+                self.swap_in()
 
-            # get the next (n = out_batch_size_tokens) indices from our read order
+            # Get the slice:
             idxs = self.read_order[self.current_token_idx: self.current_token_idx + self.OUT_BATCH_SIZE_TOKENS]
             self.current_token_idx += len(idxs)
-
-            # return the batch
             return self.activation_buffer[idxs]
 
-    def get_batch_boards(self, batch_size=None) -> List[LeelaBoard]:
+    def swap_in(self):
         """
-        Return a list of boards, size self.refresh_batch_size
+        Attempt to retrieve a new buffer from the queue, move it to self.device,
+        and make it the new activation_buffer.
         """
-        if batch_size is None:
-            batch_size = self.refresh_batch_size_boards
+        # Mark old activation_buffer for GC or reuse.
+        # Wait for the worker to produce the backup buffer:
         try:
-            return [
-                next(self.input_data_generator) for _ in range(batch_size)
-            ]
-        except StopIteration:
-            raise StopIteration("End of data stream reached")
+            new_backup_buffer = self.data_q.get(timeout=60)  # wait up to 30s
+            # Move it to device (GPU or otherwise) for immediate usage
+            new_backup_buffer = new_backup_buffer.to(self.device)
+            # Swap:
+            self.activation_buffer = new_backup_buffer
+            # Re-init read order:
+            self.read_order = t.randperm(len(self.activation_buffer), device=self.device)
+            self.current_token_idx = 0
+        except queue.Empty:
+            print("Warning: Timed out waiting for backup buffer from worker!")
+            # Optionally raise StopIteration or handle more gracefully.
+            raise StopIteration("No more data in queue.")
 
-    def tokenized_batch(self, batch_size=None) -> t.Tensor:
+
+    def close(self):
         """
-        Return a batch of tokenized inputs.
+        Signal the worker to stop and clean up.
         """
-        boards = self.get_batch_boards(batch_size=batch_size)
-        return self.transformer_model.tokenizer(
-            boards
-        )
+        self.done_event.set()
+        self.process.join(timeout=10)
+        self.data_q.close()
+        self.data_q.join_thread()
+        # If your input_data_generator needs cleanup:
+        # self.input_data_generator.close()
 
-
-    def refresh(self):
-        # This seems like it is fucking everything up
-        # gc.collect()
-        t.cuda.empty_cache()
-
-        self.activation_buffer = t.empty(self.SIZE_OF_BUFFER_IN_TOKENS, self.d_submodule, device=self.device,
-                                         dtype=self.transformer_model.dtype)
-
-
-        # Optional progress bar when filling buffer. At larger models / buffer sizes (e.g. gemma-2-2b, 1M tokens on a 4090) this can take a couple minutes.
-        # pbar = tqdm(total=self.activation_buffer_size, initial=current_idx, desc="Refreshing activations")
-        idx = 0
-
-        while idx < self.SIZE_OF_BUFFER_IN_TOKENS:
-            with t.no_grad():
-                with self.transformer_model.trace(
-                        self.get_batch_boards(),
-                        **tracer_kwargs,
-                ):
-                    if self.io == "in":
-                        hidden_states = self.submodule_to_probe.inputs[0].save()
-                    else:
-                        hidden_states = self.submodule_to_probe.output.save()
-
-                    self.submodule_to_probe.output.stop()
-
-            # Flatten along the first dimension (flatten batches and boards together), we only need random residual encodings from now on
-            hidden_states = hidden_states.reshape(-1, 768)
-
-            remaining_space = self.SIZE_OF_BUFFER_IN_TOKENS - idx
-            assert remaining_space > 0
-            hidden_states = hidden_states[:remaining_space] # truncate our hidden states in case the buffer is full
-
-            logger.trace(
-                f"Moving hidden_states shape {hidden_states.shape} to {self.device} and setting activations with shape {self.activation_buffer.shape}"
-            )
-
-            # Fill buffer with the hidden states (model activations)
-            self.activation_buffer[idx: idx + len(hidden_states)] = hidden_states.to(self.device)
-            idx += len(hidden_states)
-
-            # pbar.update(len(hidden_states))
-
-        # pbar.close()
-
-        # initialize read order
-        self.read_order = t.randperm(len(self.activation_buffer), device=self.device)
-        self.current_token_idx = 0
 
     @property
     def config(self):
@@ -320,299 +206,3 @@ class LeelaImpActivationBuffer():
             'device': self.device
         }
 
-    def close(self):
-        """
-        Close the text stream and the underlying compressed file.
-        """
-        self.input_data_generator.close()
-
-class HeadActivationBuffer:
-    """
-    This is specifically designed for training SAEs for individual attn heads in Llama3. 
-    Much redundant code; can eventually be merged to ActivationBuffer.
-    Implements a buffer of activations. The buffer stores activations from a model,
-    yields them in batches, and refreshes them when the buffer is less than half full.
-    """
-
-    def __init__(self,
-                 data,  # generator which yields text data
-                 model: LanguageModel,  # LanguageModel from which to extract activations
-                 layer,  # submodule of the model from which to extract activations
-                 n_ctxs=3e4,  # approximate number of contexts to store in the buffer
-                 ctx_len=128,  # length of each context
-                 refresh_batch_size=512,  # size of batches in which to process the data when adding to buffer
-                 out_batch_size=8192,  # size of batches in which to yield activations
-                 device='cpu',  # device on which to store the activations
-                 apply_W_O=False,
-                 remote=False,
-                 ):
-
-        self.layer = layer
-        self.n_heads = model.config.num_attention_heads
-        self.resid_dim = model.config.hidden_size
-        self.head_dim = self.resid_dim // self.n_heads
-        self.data = data
-        self.model = model
-        self.n_ctxs = n_ctxs
-        self.ctx_len = ctx_len
-        self.refresh_batch_size = refresh_batch_size
-        self.out_batch_size = out_batch_size
-        self.device = device
-        self.apply_W_O = apply_W_O
-        self.remote = remote
-
-        self.activations = t.empty(0, self.n_heads, self.head_dim,
-                                   device=device)  # [seq-pos, n_layers, n_head, head_dim]
-        self.read = t.zeros(0).bool()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        """
-        Return a batch of activations
-        """
-        with t.no_grad():
-            # if buffer is less than half full, refresh
-            if (~self.read).sum() < self.n_ctxs * self.ctx_len // 2:
-                self.refresh()
-
-            # return a batch
-            unreads = (~self.read).nonzero().squeeze()
-            idxs = unreads[t.randperm(len(unreads), device=unreads.device)[:self.out_batch_size]]
-            self.read[idxs] = True
-            return self.activations[idxs]
-
-    def text_batch(self, batch_size=None):
-        """
-        Return a list of text
-        """
-        if batch_size is None:
-            batch_size = self.refresh_batch_size
-        try:
-            return [
-                next(self.data) for _ in range(batch_size)
-            ]
-        except StopIteration:
-            raise StopIteration("End of data stream reached")
-
-    def tokenized_batch(self, batch_size=None):
-        """
-        Return a batch of tokenized inputs.
-        """
-        texts = self.text_batch(batch_size=batch_size)
-        return self.model.tokenizer(
-            texts,
-            return_tensors='pt',
-            max_length=self.ctx_len,
-            padding=True,
-            truncation=True
-        )
-
-    def refresh(self):
-        self.activations = self.activations[~self.read]
-
-        while len(self.activations) < self.n_ctxs * self.ctx_len:
-            with t.no_grad():
-                with self.model.trace(self.text_batch(), **tracer_kwargs,
-                                      invoker_args={'truncation': True, 'max_length': self.ctx_len},
-                                      remote=self.remote):
-                    input = self.model.inputs.save()
-                    hidden_states = self.model.model.layers[self.layer].self_attn.o_proj.inputs[0][0]  #.save()
-                    if isinstance(hidden_states, tuple):
-                        hidden_states = hidden_states[0]
-
-                    # Reshape by head
-                    new_shape = hidden_states.size()[:-1] + (
-                        self.n_heads, self.head_dim)  # (batch_size, seq_len, n_heads, head_dim)
-                    hidden_states = hidden_states.view(*new_shape)
-
-                    # Optionally map from head dim to resid dim
-                    if self.apply_W_O:
-                        hidden_states_W_O_shape = hidden_states.size()[:-1] + (
-                            self.model.config.hidden_size,)  # (batch_size, seq_len, n_heads, resid_dim)
-                        hidden_states_W_O = t.zeros(hidden_states_W_O_shape, device=hidden_states.device)
-                        for h in range(self.n_heads):
-                            start = h * self.head_dim
-                            end = (h + 1) * self.head_dim
-                            hidden_states_W_O[..., h, start:end] = hidden_states[..., h, :]
-                        hidden_states = self.model.model.layers[self.layer].self_attn.o_proj(hidden_states_W_O).save()
-
-            # Apply attention mask
-            attn_mask = input.value[1]['attention_mask']
-            hidden_states = hidden_states[attn_mask != 0]
-
-            # Save results
-            self.activations = t.cat([self.activations, hidden_states.to(self.device)], dim=0)
-            self.read = t.zeros(len(self.activations), dtype=t.bool, device=self.device)
-
-    @property
-    def config(self):
-        return {
-            'layer': self.layer,
-            'n_ctxs': self.n_ctxs,
-            'ctx_len': self.ctx_len,
-            'refresh_batch_size': self.refresh_batch_size,
-            'out_batch_size': self.out_batch_size,
-            'device': self.device
-        }
-
-    def close(self):
-        """
-        Close the text stream and the underlying compressed file.
-        """
-        self.text_stream.close()
-
-
-class NNsightActivationBuffer:
-    """
-    Implements a buffer of activations. The buffer stores activations from a model,
-    yields them in batches, and refreshes them when the buffer is less than half full.
-    """
-
-    def __init__(
-            self,
-            data,  # generator which yields text data
-            model: LanguageModel,  # LanguageModel from which to extract activations
-            submodule,  # submodule of the model from which to extract activations
-            d_submodule=None,  # submodule dimension; if None, try to detect automatically
-            io="out",
-            # can be 'in' or 'out'; whether to extract input or output activations, "in_and_out" for transcoders
-            n_ctxs=3e4,  # approximate number of contexts to store in the buffer
-            ctx_len=128,  # length of each context
-            refresh_batch_size=512,  # size of batches in which to process the data when adding to buffer
-            out_batch_size=8192,  # size of batches in which to yield activations
-            device="cpu",  # device on which to store the activations
-    ):
-
-        if io not in ["in", "out", "in_and_out"]:
-            raise ValueError("io must be either 'in' or 'out' or 'in_and_out'")
-
-        if d_submodule is None:
-            try:
-                if io == "in":
-                    d_submodule = submodule.in_features
-                else:
-                    d_submodule = submodule.out_features
-            except:
-                raise ValueError("d_submodule cannot be inferred and must be specified directly")
-
-        if io in ["in", "out"]:
-            self.activations = t.empty(0, d_submodule, device=device)
-        elif io == "in_and_out":
-            self.activations = t.empty(0, 2, d_submodule, device=device)
-
-        self.read = t.zeros(0).bool()
-
-        self.data = data
-        self.model = model
-        self.submodule = submodule
-        self.d_submodule = d_submodule
-        self.io = io
-        self.n_ctxs = n_ctxs
-        self.ctx_len = ctx_len
-        self.refresh_batch_size = refresh_batch_size
-        self.out_batch_size = out_batch_size
-        self.device = device
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        """
-        Return a batch of activations
-        """
-        with t.no_grad():
-            # if buffer is less than half full, refresh
-            if (~self.read).sum() < self.n_ctxs * self.ctx_len // 2:
-                self.refresh()
-
-            # return a batch
-            unreads = (~self.read).nonzero().squeeze()
-            idxs = unreads[t.randperm(len(unreads), device=unreads.device)[: self.out_batch_size]]
-            self.read[idxs] = True
-            return self.activations[idxs]
-
-    def tokenized_batch(self, batch_size=None):
-        """
-        Return a batch of tokenized inputs.
-        """
-        texts = self.text_batch(batch_size=batch_size)
-        return self.model.tokenizer(
-            texts, return_tensors="pt", max_length=self.ctx_len, padding=True, truncation=True
-        )
-
-    def token_batch(self, batch_size=None):
-        """
-        Return a list of text
-        """
-        if batch_size is None:
-            batch_size = self.refresh_batch_size
-        try:
-            return t.tensor([next(self.data) for _ in range(batch_size)], device=self.device)
-        except StopIteration:
-            raise StopIteration("End of data stream reached")
-
-    def text_batch(self, batch_size=None):
-        """
-        Return a list of text
-        """
-        # if batch_size is None:
-        #     batch_size = self.refresh_batch_size
-        # try:
-        #     return [next(self.data) for _ in range(batch_size)]
-        # except StopIteration:
-        #     raise StopIteration("End of data stream reached")
-        return self.token_batch(batch_size)
-
-    def _reshaped_activations(self, hidden_states):
-        hidden_states = hidden_states.value
-        if isinstance(hidden_states, tuple):
-            hidden_states = hidden_states[0]
-        batch_size, seq_len, d_model = hidden_states.shape
-        hidden_states = hidden_states.view(batch_size * seq_len, d_model)
-        return hidden_states
-
-    def refresh(self):
-        self.activations = self.activations[~self.read]
-
-        while len(self.activations) < self.n_ctxs * self.ctx_len:
-
-            with t.no_grad(), self.model.trace(
-                    self.token_batch(),
-                    **tracer_kwargs,
-                    invoker_args={"truncation": True, "max_length": self.ctx_len},
-            ):
-                if self.io in ["in", "in_and_out"]:
-                    hidden_states_in = self.submodule.inputs[0].save()
-                if self.io in ["out", "in_and_out"]:
-                    hidden_states_out = self.submodule.output.save()
-
-            if self.io == "in":
-                hidden_states = self._reshaped_activations(hidden_states_in)
-            elif self.io == "out":
-                hidden_states = self._reshaped_activations(hidden_states_out)
-            elif self.io == "in_and_out":
-                hidden_states_in = self._reshaped_activations(hidden_states_in).unsqueeze(1)
-                hidden_states_out = self._reshaped_activations(hidden_states_out).unsqueeze(1)
-                hidden_states = t.cat([hidden_states_in, hidden_states_out], dim=1)
-            self.activations = t.cat([self.activations, hidden_states.to(self.device)], dim=0)
-            self.read = t.zeros(len(self.activations), dtype=t.bool, device=self.device)
-
-    @property
-    def config(self):
-        return {
-            "d_submodule": self.d_submodule,
-            "io": self.io,
-            "n_ctxs": self.n_ctxs,
-            "ctx_len": self.ctx_len,
-            "refresh_batch_size": self.refresh_batch_size,
-            "out_batch_size": self.out_batch_size,
-            "device": self.device,
-        }
-
-    def close(self):
-        """
-        Close the text stream and the underlying compressed file.
-        """
-        self.text_stream.close()
