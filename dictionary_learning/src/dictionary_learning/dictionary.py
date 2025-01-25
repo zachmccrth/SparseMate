@@ -52,7 +52,7 @@ class AutoEncoder(Dictionary, nn.Module):
         self.dict_size = dict_size
         self.bias = nn.Parameter(t.zeros(activation_dim))
         self.encoder = nn.Linear(activation_dim, dict_size, bias=True)
-        self.decoder = nn.Linear(dict_size, activation_dim, bias=False)
+        self.decoder = nn.Linear(dict_size, activation_dim, bias=True)
 
         # initialize encoder and decoder weights
         w = t.randn(activation_dim, dict_size)
@@ -63,10 +63,10 @@ class AutoEncoder(Dictionary, nn.Module):
         self.decoder.weight = nn.Parameter(w.clone())
 
     def encode(self, x):
-        return nn.LeakyReLU(1e-3)(self.encoder(x - self.bias))
+        return nn.ReLU()(self.encoder(x))
 
     def decode(self, f):
-        return self.decoder(f) + self.bias
+        return self.decoder(f)
 
     def forward(self, x, output_features=False, ghost_mask=None):
         """
@@ -423,3 +423,57 @@ class AutoEncoderNew(Dictionary, nn.Module):
         if device is not None:
             autoencoder.to(device)
         return autoencoder
+
+
+class AttentionSeekingAutoEncoder(Dictionary, nn.Module):
+    """
+    Zach's personal project
+    """
+
+    def __init__(self, activation_dim, dict_size, device="cpu", dtype=t.float32):
+        super().__init__()
+        self.activation_dim = activation_dim
+        self.dict_size = dict_size
+
+        self.features = nn.Parameter(t.nn.init.kaiming_uniform_(t.empty(dict_size, activation_dim, device=device)))
+
+        # Selector initialized as the identity transformation
+        self.selector = nn.Linear(dict_size, dict_size, bias=True, device=device, dtype=dtype)
+        torch.nn.init.eye_(self.selector.weight)  # Set weight to identity
+        torch.nn.init.constant_(self.selector.bias, 0)  # Set bias to zero
+
+        self.dtype = dtype
+
+        self.threshold = nn.Parameter(t.ones(dict_size, device=device) * 0.00001)  # Appendix I
+
+
+    def encode(self, x):
+        return torch.nn.ReLU()(self.selector(   torch.nn.ReLU()(torch.nn.functional.linear(x, self.features))      ))
+
+    def decode(self, f):
+        return torch.nn.functional.linear(f, self.features.T)
+
+    def forward(self, x, output_features=False):
+        """
+        Forward pass of an autoencoder.
+        x : activations to be autoencoded
+        output_features : if True, return the encoded features (and their pre-jump version) as well as the decoded x
+        """
+        f = self.encode(x)
+        x_hat = self.decode(f)
+        if output_features:
+            return x_hat, f
+        else:
+            return x_hat
+
+
+    @classmethod
+    def from_pretrained(cls, path, device=None, **kwargs) -> "Dictionary":
+        state_dict = t.load(path)
+        dict_size, activation_dim = state_dict["features"].shape
+        autoencoder = AttentionSeekingAutoEncoder(activation_dim, dict_size)
+        autoencoder.load_state_dict(state_dict)
+        if device is not None:
+            autoencoder.to(device)
+        return autoencoder
+
