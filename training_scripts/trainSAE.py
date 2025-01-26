@@ -2,6 +2,7 @@ from datetime import datetime
 import sys
 
 from dictionary_learning.trainers.attention_seeking import AttentionSeekingTrainer
+from model_tools.truncated_leela import TruncatedModel
 
 if __name__ == '__main__':
     # Add the main project directory to sys.path
@@ -65,13 +66,13 @@ if __name__ == '__main__':
         "steps": steps,
         "layer": layer,
         "lm_name": "leela",
-        "wandb_name": f"{trainer.__name__}_{datetime.now().strftime('%m%d_%H:%M')}",
+        "wandb_name": f"{trainer.__name__}_{datetime.now().strftime('%m%d_%H:%M')}".strip(':'),
         "device": str(device),
         "target_l0": 40,
         "sparsity_warmup_steps": sparsity_warmup_steps,
         "warmup_steps": sparsity_warmup_steps,
         "sparsity_penalty" : 0.1,
-        # "batch_size": tokens_per_step,
+        "submodule_name": TruncatedModel.__name__,
     }
 
     # train the sparse autoencoder (SAE)

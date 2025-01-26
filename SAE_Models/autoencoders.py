@@ -34,7 +34,7 @@ class AutoEncoderDirectory:
                 with open(config_path) as json_file:
                     config = json.load(json_file)
                     config["timestamp"] = os.path.getctime(config_path)
-                    config["model_location"] = os.path.join(item_path, "ae.pt")
+                    config["model_path"] = os.path.join(item_path, "ae.pt")
                     self.models[item] = config
 
 
@@ -43,3 +43,16 @@ class AutoEncoderDirectory:
             except Exception as e:
                 print(f"Error reading {config_path}: {e}")
 
+    def get_last_created_model(self):
+        """
+        Returns the configuration dictionary of the most recently created model based on its timestamp.
+        """
+        if not self.models:
+            print("No models found.")
+            return None
+
+        # Find the model with the latest timestamp
+        last_model = max(self.models.items(), key=lambda x: x[1]['timestamp'])
+
+        # Return the config dictionary of the last created model
+        return last_model[1]

@@ -1,37 +1,36 @@
 from typing import List
 import sys
-
 import numpy as np
+
+from SAE_Models.autoencoders import AutoEncoderDirectory
 from datasets.chessbench.bag_data import ChessBenchDataset
+from model_tools.truncated_leela import TruncatedModel
 from dictionary_learning.dictionary import *
+
 
 # Add the main project directory to sys.path
 project_dir = "/"
 sys.path.append(project_dir)
-from line_profiler import profile
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dictionary_learning.buffer import tracer_kwargs
 from leela_interp.core.leela_board import LeelaBoard
-from leela_interp.core.leela_nnsight import Lc0sight
 
 import sqlite3
 import torch
 
-
-
 class BoardActivationBuffer:
-    def __init__(self, data, model, submodule, d_submodule, device, size=20,):
+    def __init__(self, data, submodule, d_submodule, device, size=20,):
         self.data = data
-        self.transformer_model = model
         self.submodule = submodule
         self.d_submodule = d_submodule
         self.device = device
         self.size = size
 
+
+        # buffer structure is size * boards_tokens * residual_dim
         self.activation_buffer = torch.empty(size, 64, self.d_submodule, device=self.device,
-                                             dtype=self.transformer_model.dtype)
+                                             dtype=torch.float32)
 
         self.boards_buffer = []
 
@@ -60,119 +59,132 @@ class BoardActivationBuffer:
         return self.boards_buffer[self.idx], self.activation_buffer[self.idx]
 
     def fill_buffer(self):
+        self.boards_buffer = self.get_batch_boards(batch_size=self.size)
+        inputs = self.submodule.make_inputs(self.boards_buffer)
         with torch.no_grad():
-            self.boards_buffer = self.get_batch_boards(batch_size=self.size)
-            with self.transformer_model.trace(
-                    self.boards_buffer,
-                    **tracer_kwargs,
-            ):
-                activations = self.submodule.output.save()
-                self.submodule.output.stop()
-
-        self.activation_buffer = activations
+            hidden_states = self.submodule(inputs)
+        self.activation_buffer = hidden_states.reshape(self.size, 64, self.d_submodule)
         self.idx = -1
         return None
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# device = torch.device("cpu")
-lc0: Lc0sight = Lc0sight("/home/zachary/PycharmProjects/leela-interp/lc0.onnx", device=device)
-# load autoencoder
-ae = AttentionSeekingAutoEncoder.from_pretrained("/home/zachary/PycharmProjects/SparseMate/scripts/save_dir/attentionseeking/ae.pt", device=device)
-layer = 6
 
-submodule = lc0.residual_stream(layer) # layer 1 MLP
-activation_dim = 768 # output dimension of the MLP
-dictionary_size = 16 * activation_dim
+def get_db_conn():
+    conn = sqlite3.connect("/home/zachary/PycharmProjects/SparseMate/SparseMate.sqlite")
+    return conn
 
+def init_table(table_name):
 
-boards_to_encode = 10000
-tokens_per_step = 64
-
-# dataset = PuzzleDataset("/home/zachary/PycharmProjects/SparseMate/datasets/lichess_db_puzzle.csv")
-dataset = ChessBenchDataset()
-
-dataloader = DataLoader(dataset, batch_size=None, batch_sampler=None)
-
-#This is an iterator
-activation_buffer = BoardActivationBuffer(
-    data=iter(dataloader),
-    model=lc0,
-    submodule=submodule,
-    d_submodule=activation_dim,
-    device=device,
-    size=100
-)
-
-def init_db():
     # Initialize SQLite database and create table
-    db_name = f"layer_{layer}_attentionseeking_chessbench.db"
-    conn = sqlite3.connect(db_name)
+    conn = get_db_conn()
     cursor = conn.cursor()
 
     # Create the table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS activations (
+    create_table = f"""
+    CREATE TABLE IF NOT EXISTS {table_name} (
         fen TEXT,
         sq TEXT,
         feature INTEGER,
         value REAL
     )
-    """)
+    """
+
+    cursor.execute(create_table)
     conn.commit()
 
+    conn.close()
+
 # Loop through buffer and insert data into the database
-@profile
-def write_to_db(db_name, max, activation_buffer, threshold=0.0001):
+def write_to_db(dataset, autoencoder_config ,total_boards_max, threshold=0.0001, device=torch.device("cpu")):
+    """
+    Takes a dataset and a model and evaluates the feature activations.
+    """
+
+
+    trainer_config = autoencoder_config["trainer"]
+    buffer_config  = autoencoder_config["buffer"]
+
+
+    table_name = trainer_config["wandb_name"].replace('_', '').replace(':','')
+    init_table(table_name)
+
+    dataloader = DataLoader(dataset, batch_size=None, batch_sampler=None)
+
+
+    onnx_model_path = buffer_config["onnx_model_path"]
+    # Have mercy for two config subfiles, something needs to change
+    submodule_class =  trainer_config["submodule_name"]
+    if submodule_class == "TruncatedModel":
+        submodule: TruncatedModel = TruncatedModel(onnx_model_path)
+    else:
+        raise Exception("Your lazy dev has not yet implemented submodules other than TruncatedModel")
+
+    #This is an iterator
+    activation_buffer = BoardActivationBuffer(
+        data=iter(dataloader),
+        submodule=submodule,
+        d_submodule=buffer_config["d_submodule"],
+        device=device,
+        size=100
+    )
+
+
+    autoencoder_path = autoencoder_config["model_path"]
+    autoencoder = globals()[trainer_config["dict_class"]].from_pretrained(autoencoder_path)
+
+    # TODO separate autoencoder loading from db writing/eval
+    # TODO maybe also decompose db writing and eval as well
+
     # Initialize database
-    conn = sqlite3.connect(db_name)
+    conn = get_db_conn()
     cursor = conn.cursor()
 
     # Batch insert data
     data_to_insert = []
     board_index = 0
-    for board, activations in tqdm(activation_buffer, total=max, unit=" boards"):
+    for board, activations in tqdm(activation_buffer, total=total_boards_max, unit=" boards"):
         assert isinstance(board, LeelaBoard)
         # Encode the batch to get the tensor
-        features: torch.Tensor = ae.encode(activations)
+        features: torch.Tensor = autoencoder.encode(activations)
         features: np.ndarray = features.detach().cpu().numpy().astype(float)
         # Get the FEN string
         fen = board.fen()
 
-
-        current_square = -1
+        current_square_idx = -1
         # Apply threshold filtering using PyTorch
 
-        squares, feature_idxs = (features >= threshold).nonzero()
-        for square, feature in zip(squares, feature_idxs):
-            square = int(square)
-            if current_square != square:
-                current_square = square
-                sq = board.idx2sq(current_square)
-            feature = int(feature)
-            value: float = float(features[square, feature])
-            data_to_insert.append((fen, sq, feature, value))
+
+        square_idxs, feature_idxs = (features >= threshold).nonzero()
+        for square_idx, feature_idx in zip(square_idxs, feature_idxs):
+            square_idx = int(square_idx)
+            feature_idx = int(feature_idx)
+            if current_square_idx != square_idx:
+                current_square_idx = square_idx
+                sq = board.idx2sq(current_square_idx)
+
+            value: float = float(features[square_idx, feature_idx])
+            data_to_insert.append((fen, sq, feature_idx, value))
         # Commit in chunks to avoid memory overflow
         if len(data_to_insert) >= 1000:  # Adjust chunk size if needed
-            cursor.executemany("""
-                INSERT INTO activations (fen, sq, feature, value)
+            cursor.executemany(f"""
+                INSERT INTO {table_name} (fen, sq, feature, value)
                 VALUES (?, ?, ?, ?)
             """, data_to_insert)
             data_to_insert.clear()
 
         board_index += 1
 
-        if board_index > max: break
+        if board_index > total_boards_max: break
 
     # Final commit for any remaining data
     if data_to_insert:
-        cursor.executemany("""
-            INSERT INTO activations (fen, sq, feature, value)
+        cursor.executemany(f"""
+            INSERT INTO {table_name} (fen, sq, feature, value)
             VALUES (?, ?, ?, ?)
         """, data_to_insert)
 
     # Create an index on the feature column
-    cursor.execute("""
-    CREATE INDEX IF NOT EXISTS idx_feature ON activations (feature);
+    cursor.execute(f"""
+    CREATE INDEX IF NOT EXISTS idx_feature ON {table_name} (feature);
     """)
 
     # Commit and close the connection
@@ -180,6 +192,17 @@ def write_to_db(db_name, max, activation_buffer, threshold=0.0001):
     conn.close()
 
 
+if __name__ == "__main__":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-write_to_db(db_name,boards_to_encode,activation_buffer, threshold=0.001)
+    num_of_boards = 20
+
+    chessbench = ChessBenchDataset()
+
+    autoencoder_directory = AutoEncoderDirectory()
+
+    last_model_run_config = autoencoder_directory.get_last_created_model()
+
+
+    write_to_db(dataset=chessbench, autoencoder_config=last_model_run_config, total_boards_max=num_of_boards, threshold=0.001, device=device)
 

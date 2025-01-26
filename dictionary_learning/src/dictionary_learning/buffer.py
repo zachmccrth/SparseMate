@@ -14,7 +14,7 @@ def _background_buffer_filler(
 ):
     """
     Runs in a background process.
-    Continuously fills a CPU backup buffer with fresh activations
+    Continuously fills a backup buffer with fresh activations
     and pushes them onto the data_q for the main process to consume.
     """
 
@@ -105,7 +105,7 @@ class LeelaImpActivationBuffer:
         )
 
 
-
+        self.onnx_model_path = onnx_model_path
 
         self.current_token_idx = len(self.activation_buffer)
 
@@ -196,6 +196,7 @@ class LeelaImpActivationBuffer:
             'ctx_len': self.BOARD_SIZE,
             'refresh_batch_size': self.refresh_batch_size_boards,
             'out_batch_size': self.OUT_BATCH_SIZE_TOKENS,
-            'device': str(self.device)
+            'device': str(self.device),
+            'onnx_model_path': self.onnx_model_path
         }
 
