@@ -1,8 +1,6 @@
 from datetime import datetime
 import sys
 
-from torch.cpu.amp import autocast
-
 from dictionary_learning.trainers.attention_seeking import AttentionSeekingTrainer
 
 if __name__ == '__main__':
@@ -32,10 +30,9 @@ if __name__ == '__main__':
         raise AssertionError(f"Steps: {steps} is less than sparsity_warmup_steps: {sparsity_warmup_steps}.")
 
     import torch
-    from data_tools.bag_data import ChessBenchDataset
-    from dictionary_learning.dictionary import JumpReluAutoEncoder, AttentionSeekingAutoEncoder
+    from datasets.bag_data import ChessBenchDataset
+    from dictionary_learning.dictionary import AttentionSeekingAutoEncoder
     from dictionary_learning.buffer import  LeelaImpActivationBuffer
-    from dictionary_learning.trainers import JumpReluTrainer
     from dictionary_learning.training import trainSAE
     import torch.multiprocessing as mp
 
@@ -84,7 +81,7 @@ if __name__ == '__main__':
         data=activation_buffer,
         trainer_configs=[trainer_cfg],
         steps=steps,
-        save_dir='save_dir',
+        save_dir='../save_dir',
         device=str(device),
         use_wandb=True,
         wandb_project="SparseMate",

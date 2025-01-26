@@ -2,18 +2,16 @@ from typing import List
 import sys
 
 import numpy as np
-
-from data_tools.bag_data import ChessBenchDataset
-from dictionary_learning.dictionary import JumpReluAutoEncoder, AttentionSeekingAutoEncoder
+from datasets.chessbench.bag_data import ChessBenchDataset
+from dictionary_learning.dictionary import *
 
 # Add the main project directory to sys.path
-project_dir = "/home/zachary/PycharmProjects/SparseMate"
+project_dir = "/"
 sys.path.append(project_dir)
 from line_profiler import profile
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from data_tools.puzzles import PuzzleDataset
 from dictionary_learning.buffer import tracer_kwargs
 from leela_interp.core.leela_board import LeelaBoard
 from leela_interp.core.leela_nnsight import Lc0sight
@@ -105,22 +103,22 @@ activation_buffer = BoardActivationBuffer(
     size=100
 )
 
+def init_db():
+    # Initialize SQLite database and create table
+    db_name = f"layer_{layer}_attentionseeking_chessbench.db"
+    conn = sqlite3.connect(db_name)
+    cursor = conn.cursor()
 
-# Initialize SQLite database and create table
-db_name = f"layer_{layer}_attentionseeking_chessbench.db"
-conn = sqlite3.connect(db_name)
-cursor = conn.cursor()
-
-# Create the table
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS activations (
-    fen TEXT,
-    sq TEXT,
-    feature INTEGER,
-    value REAL
-)
-""")
-conn.commit()
+    # Create the table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS activations (
+        fen TEXT,
+        sq TEXT,
+        feature INTEGER,
+        value REAL
+    )
+    """)
+    conn.commit()
 
 # Loop through buffer and insert data into the database
 @profile
