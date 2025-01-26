@@ -2,15 +2,9 @@ import torch as t
 from torch.utils.data import DataLoader
 
 from model_tools.truncated_leela import TruncatedModel
-from .config import DEBUG
 import torch.multiprocessing as mp
 import queue
 
-
-if DEBUG:
-    tracer_kwargs = {'scan': True, 'validate': True}
-else:
-    tracer_kwargs = {}
 
 def _background_buffer_filler(
         cfg,  # dictionary with config info
@@ -198,11 +192,10 @@ class LeelaImpActivationBuffer:
     def config(self):
         return {
             'd_submodule': self.d_submodule,
-            'io': self.io,
             'n_ctxs': self.size_of_buffer_in_boards,
             'ctx_len': self.BOARD_SIZE,
             'refresh_batch_size': self.refresh_batch_size_boards,
             'out_batch_size': self.OUT_BATCH_SIZE_TOKENS,
-            'device': self.device
+            'device': str(self.device)
         }
 

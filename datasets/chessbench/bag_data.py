@@ -111,7 +111,7 @@ class BagFileReader(Sequence[bytes]):
 
 
 class ChessBenchDataset(torch.utils.data.Dataset):
-    def __init__(self, file_path = "/home/zachary/PycharmProjects/SparseMate/datasets/action_value-00000-of-02148_data.bag",):
+    def __init__(self, file_path = "/home/zachary/PycharmProjects/SparseMate/datasets/chessbench/action_value-00000-of-02148_data.bag",):
         self.device = None
         self.file_path = file_path
         self.bag_reader = BagFileReader(file_path)

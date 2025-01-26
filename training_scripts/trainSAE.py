@@ -15,13 +15,13 @@ if __name__ == '__main__':
 
     buffer_size_boards = 4_000
 
-    boards_to_train_on = buffer_size_boards * 2000
+    boards_to_train_on = buffer_size_boards * 5
 
     tokens_per_step = 5000
 
     steps = (boards_to_train_on * 64)// tokens_per_step
 
-    sparsity_warmup_steps = 1000
+    sparsity_warmup_steps = 1
 
     print(f"Training on {boards_to_train_on * 64:,} tokens ({boards_to_train_on:,} boards) in {steps:,} training steps")
     print(f"Estimated time: {(boards_to_train_on * 64 / 29_000)/60:0.2f} minutes")
@@ -30,22 +30,20 @@ if __name__ == '__main__':
         raise AssertionError(f"Steps: {steps} is less than sparsity_warmup_steps: {sparsity_warmup_steps}.")
 
     import torch
-    from datasets.bag_data import ChessBenchDataset
+    from datasets import ChessBenchDataset
     from dictionary_learning.dictionary import AttentionSeekingAutoEncoder
     from dictionary_learning.buffer import  LeelaImpActivationBuffer
     from dictionary_learning.training import trainSAE
     import torch.multiprocessing as mp
 
     mp.set_start_method('spawn', force=True)  # Use spawn for CUDA compatibility
-    torch.set_float32_matmul_precision("high")
+    torch.set_float32_matmul_precision("high") # Should get a performance improved (torch float for ampere?)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
     activation_dim = 768 # output dimension of the MLP
     dictionary_size = 8 * activation_dim
 
     dataset_class = ChessBenchDataset
-
 
     activation_buffer = LeelaImpActivationBuffer(
         dataset_class=dataset_class,
@@ -81,7 +79,7 @@ if __name__ == '__main__':
         data=activation_buffer,
         trainer_configs=[trainer_cfg],
         steps=steps,
-        save_dir='../save_dir',
+        save_dir="/home/zachary/PycharmProjects/SparseMate/SAE_Models",
         device=str(device),
         use_wandb=True,
         wandb_project="SparseMate",
