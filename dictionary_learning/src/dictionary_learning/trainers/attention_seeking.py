@@ -6,7 +6,7 @@ import wandb
 from torch import nn
 from typing import Optional
 
-from dictionary_learning.dictionary import AttentionSeekingAutoEncoder
+from dictionary_learning.dictionary import JumpReLU
 from .jumprelu import StepFunction
 from ..trainers.trainer import (
     SAETrainer,
@@ -32,7 +32,7 @@ class AttentionSeekingTrainer(nn.Module, SAETrainer):
         dict_size: int,
         layer: int,
         lm_name: str,
-        dict_class=AttentionSeekingAutoEncoder,
+        dict_class=JumpReLU,
         seed: Optional[int] = None,
         # TODO: What's the default lr use in the paper?
         lr: float = 7e-5,
