@@ -8,7 +8,6 @@ import torch
 import torch as t
 import torch.nn as nn
 import torch.nn.init as init
-import einops
 
 
 class Dictionary(ABC, nn.Module):
@@ -425,7 +424,7 @@ class AutoEncoderNew(Dictionary, nn.Module):
         return autoencoder
 
 
-class AttentionSeekingAutoEncoder(Dictionary, nn.Module):
+class JumpReLU(Dictionary, nn.Module):
     """
     Zach's personal project
     """
@@ -471,7 +470,7 @@ class AttentionSeekingAutoEncoder(Dictionary, nn.Module):
     def from_pretrained(cls, path, device=None, **kwargs) -> "Dictionary":
         state_dict = t.load(path)
         dict_size, activation_dim = state_dict["features"].shape
-        autoencoder = AttentionSeekingAutoEncoder(activation_dim, dict_size)
+        autoencoder = JumpReLU(activation_dim, dict_size)
         autoencoder.load_state_dict(state_dict)
         if device is not None:
             autoencoder.to(device)

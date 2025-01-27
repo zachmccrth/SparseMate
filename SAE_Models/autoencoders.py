@@ -13,7 +13,7 @@ class AutoEncoderDirectory:
         """
         Refreshes the list of models within the autoencoder directory.
 
-        Pulls configuration information from the config.json file associated with each model for later use
+        Pulls configuration information from the config.json file associated with each model for use by clients
         """
         self.models = dict()
 
@@ -56,3 +56,5 @@ class AutoEncoderDirectory:
 
         # Return the config dictionary of the last created model
         return last_model[1]
+
+    # TODO, it might be nice to encapsulate much of the init logic here

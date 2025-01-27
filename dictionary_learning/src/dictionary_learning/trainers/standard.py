@@ -1,7 +1,6 @@
 """
 Implements the standard SAE training scheme.
 """
-import numpy as np
 import torch as t
 from typing import Optional
 
