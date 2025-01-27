@@ -47,6 +47,22 @@ class TruncatedModel(nn.Module):
         )
 
 
+    def export2onnx(self, onnx_model_path):
+        # Dummy input matching the model's input size
+        dummy_input = torch.randn(64, 768)  # Example for an image model like ResNet
+
+        # Export the model
+        torch.onnx.export(
+            self,  # Your PyTorch model
+            dummy_input,  # Example input tensor
+            "model.onnx",  # Output ONNX file name
+            export_params=True,  # Store the trained parameters in the model file
+            opset_version=11,  # ONNX version (TensorRT supports versions 7-13)
+            do_constant_folding=True,  # Optimize constant folding
+            input_names=["input"],  # Input names
+            output_names=["output"]  # Output names
+        )
+
 
 if __name__ == "__main__":
     layer_n = 6  # Number of layers you want to retain

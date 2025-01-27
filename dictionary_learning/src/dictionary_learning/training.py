@@ -4,7 +4,6 @@ Training dictionaries
 
 import json
 
-import torch
 import torch.multiprocessing as mp
 import os
 from queue import Empty
@@ -16,7 +15,7 @@ from tqdm import tqdm
 
 from torch.utils.tensorboard import SummaryWriter
 
-def new_training_logging_process(config, metric_queue, entity, project):
+def new_training_logging_process(config, metric_queue):
     writer = SummaryWriter(filename_suffix=config["wandb_name"])
     while True:
         try:
@@ -24,7 +23,7 @@ def new_training_logging_process(config, metric_queue, entity, project):
             if metric_log == "DONE":
                 break
             for metric, value in metric_log.items():
-                writer.add_scalar(metric, value, global_step=metric_log["step"])
+                writer.add_scalar(metric, float(value), global_step=metric_log["step"])
         except Empty:
             continue
     writer.close()
@@ -42,22 +41,25 @@ def log_metrics(
         residual = z.clone()
         residual, residual_reconstruction, feature_encoding, loss_log = trainer.loss(residual, step=step, logging=True)
 
-        log = {}
+        log = {"step": step}
         # L0
         l0 = (feature_encoding != 0).float().sum(dim=-1).mean().item()
+        log[f"l0"] = l0
+
         # fraction of variance explained
         total_variance = t.var(residual, dim=0).sum()
         residual_variance = t.var(residual - residual_reconstruction, dim=0).sum()
         frac_variance_explained = 1 - residual_variance / total_variance
         log[f"frac_variance_explained"] = frac_variance_explained.item()
 
-        # log parameters from training
+        # Log Gradient Norm
+        if hasattr(trainer, 'last_grad_norm') and trainer.last_grad_norm:
+            log["grad_norm"] = trainer.last_grad_norm
+
+        # log losses from training
         log.update({f"{k}": v.cpu().item() if isinstance(v, t.Tensor) else v for k, v in loss_log.items()})
-        log[f"l0"] = l0
-        log["tokens"] = step * trainer.batch_size
+
         trainer_log = trainer.get_logging_parameters()
-        if trainer.last_grad_norm is not None:
-            trainer_log["grad_norm"] = trainer.last_grad_norm
         for name, value in trainer_log.items():
             if isinstance(value, t.Tensor):
                 value = value.cpu().item()
@@ -92,7 +94,6 @@ def get_norm_factor(data, steps: int) -> float:
     print(f"Norm factor: {norm_factor}")
     
     return norm_factor
-
 
 
 def trainSAE(
@@ -138,11 +139,11 @@ def trainSAE(
                       for k, v in wandb_config.items()}
         tensorboard_process = mp.Process(
             target=new_training_logging_process,
-            args=(wandb_config, metric_log_queue, wandb_entity, wandb_project),
+            args=(wandb_config, metric_log_queue),
         )
         tensorboard_process.start()
 
-    # make save dir, export config
+    # make save_dir, export config
     if save_dir is not None:
         save_dir = os.path.join(save_dir, f"{trainer_config["wandb_name"]}")
         os.makedirs(save_dir, exist_ok=True)
@@ -153,7 +154,7 @@ def trainSAE(
             # TODO swallows errors, very bad
         except:
             pass
-        with open(os.path.join(dir, "config.json"), "w") as f:
+        with open(os.path.join(save_dir, "config.json"), "w") as f:
             json.dump(config, f, indent=4)
 
     if normalize_activations:
@@ -195,13 +196,13 @@ def trainSAE(
                     # Temporarily scale up biases for checkpoint saving
                     trainer.ae.scale_biases(norm_factor)
 
-                if not os.path.exists(os.path.join(dir, "checkpoints")):
+                if not os.path.exists(os.path.join(save_dir, "checkpoints")):
                     os.mkdir(os.path.join(dir, "checkpoints"))
 
                 checkpoint = {k: v.cpu() for k, v in trainer.ae.state_dict().items()}
                 t.save(
                     checkpoint,
-                    os.path.join(dir, "checkpoints", f"ae_{step}.pt"),
+                    os.path.join(save_dir, "checkpoints", f"ae_{step}.pt"),
                 )
 
                 if normalize_activations:

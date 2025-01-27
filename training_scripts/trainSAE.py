@@ -1,7 +1,6 @@
 from datetime import datetime
 import sys
 
-from dictionary_learning.trainers.jumprelu import JumpReLUFunction
 from model_tools.truncated_leela import TruncatedModel
 import torch
 from datasets import ChessBenchDataset
@@ -19,12 +18,12 @@ if __name__ == '__main__':
     dataset_class = ChessBenchDataset
     # Train the SAE
     trainer_class = JumpReluTrainer
-    autoencoder_class = JumpReLU
+    autoencoder_class = JumpReluAutoEncoder
 
 
 
     tokens_per_step = 5000
-    boards_to_train_on = 100_000
+    boards_to_train_on = 10_000
     sparsity_warmup_boards = 1000
 
     steps = (boards_to_train_on * 64)// tokens_per_step
@@ -79,7 +78,7 @@ if __name__ == '__main__':
     # train the sparse autoencoder (SAE)
     ae= trainSAE(
         data=activation_buffer,
-        trainer_configs=[trainer_cfg],
+        trainer_config=trainer_cfg,
         steps=steps,
         save_dir="/home/zachary/PycharmProjects/SparseMate/SAE_Models",
         device=str(device),
