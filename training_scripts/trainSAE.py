@@ -83,7 +83,7 @@ if __name__ == '__main__':
         steps=steps,
         save_dir="/home/zachary/PycharmProjects/SparseMate/SAE_Models",
         device=str(device),
-        use_wandb=True,
+        use_tensorboard=True,
         wandb_project="SparseMate",
         wandb_entity="zacharymccrth",
         log_steps=10,

@@ -14,72 +14,57 @@ from contextlib import nullcontext
 import torch as t
 from tqdm import tqdm
 
-import wandb
+from torch.utils.tensorboard import SummaryWriter
 
-
-def new_wandb_process(config, log_queue, entity, project):
-    wandb.init(entity=entity, project=project, config=config, name=config["wandb_name"])
+def new_training_logging_process(config, metric_queue, entity, project):
+    writer = SummaryWriter(filename_suffix=config["wandb_name"])
     while True:
         try:
-            log = log_queue.get(timeout=1)
-            if log == "DONE":
+            metric_log = metric_queue.get(timeout=1)
+            if metric_log == "DONE":
                 break
-            wandb.log(log)
+            for metric, value in metric_log.items():
+                writer.add_scalar(metric, value, global_step=metric_log["step"])
         except Empty:
             continue
-    wandb.finish()
+    writer.close()
 
 
-def log_stats(
-    trainers,
+def log_metrics(
+    trainer,
     step: int,
-    act: t.Tensor,
-    activations_split_by_head: bool,
-    transcoder: bool,
-    log_queues: list=[],
-    verbose: bool=False,
+    residual: t.Tensor,
+    log_queue: mp.Queue,
 ):
     with t.no_grad():
         # quick hack to make sure all trainers get the same x
-        z = act.clone()
-        for i, trainer in enumerate(trainers):
-            log = {}
-            act = z.clone()
-            if activations_split_by_head:  # x.shape: [batch, pos, n_heads, d_head]
-                act = act[..., i, :]
-            if not transcoder:
-                act, act_hat, f, losslog = trainer.loss(act, step=step, logging=True)
+        z = residual.clone()
+        residual = z.clone()
+        residual, residual_reconstruction, feature_encoding, loss_log = trainer.loss(residual, step=step, logging=True)
 
-                # L0
-                l0 = (f != 0).float().sum(dim=-1).mean().item()
-                # fraction of variance explained
-                total_variance = t.var(act, dim=0).sum()
-                residual_variance = t.var(act - act_hat, dim=0).sum()
-                frac_variance_explained = 1 - residual_variance / total_variance
-                log[f"frac_variance_explained"] = frac_variance_explained.item()
-            else:  # transcoder
-                x, x_hat, f, losslog = trainer.loss(act, step=step, logging=True)
+        log = {}
+        # L0
+        l0 = (feature_encoding != 0).float().sum(dim=-1).mean().item()
+        # fraction of variance explained
+        total_variance = t.var(residual, dim=0).sum()
+        residual_variance = t.var(residual - residual_reconstruction, dim=0).sum()
+        frac_variance_explained = 1 - residual_variance / total_variance
+        log[f"frac_variance_explained"] = frac_variance_explained.item()
 
-                # L0
-                l0 = (f != 0).float().sum(dim=-1).mean().item()
+        # log parameters from training
+        log.update({f"{k}": v.cpu().item() if isinstance(v, t.Tensor) else v for k, v in loss_log.items()})
+        log[f"l0"] = l0
+        log["tokens"] = step * trainer.batch_size
+        trainer_log = trainer.get_logging_parameters()
+        if trainer.last_grad_norm is not None:
+            trainer_log["grad_norm"] = trainer.last_grad_norm
+        for name, value in trainer_log.items():
+            if isinstance(value, t.Tensor):
+                value = value.cpu().item()
+            log[f"{name}"] = value
 
-            if verbose:
-                print(f"Step {step}: L0 = {l0}, frac_variance_explained = {frac_variance_explained}")
-
-            # log parameters from training
-            log.update({f"{k}": v.cpu().item() if isinstance(v, t.Tensor) else v for k, v in losslog.items()})
-            log[f"l0"] = l0
-            # log["tokens"] = step * trainer.batch_size
-            trainer_log = trainer.get_logging_parameters()
-            if trainer.last_grad_norm is not None:
-                trainer_log["grad_norm"] = trainer.last_grad_norm
-            for name, value in trainer_log.items():
-                if isinstance(value, t.Tensor):
-                    value = value.cpu().item()
-                log[f"{name}"] = value
-
-            if log_queues:
-                log_queues[i].put(log)
+        if log_queue:
+            log_queue.put(log)
 
 def get_norm_factor(data, steps: int) -> float:
     """Per Section 3.1, find a fixed scalar factor so activation vectors have unit mean squared norm.
@@ -112,19 +97,16 @@ def get_norm_factor(data, steps: int) -> float:
 
 def trainSAE(
     data,
-    trainer_configs: list[dict],
+    trainer_config: dict,
     steps: int,
-    use_wandb:bool=False,
+    use_tensorboard:bool=False,
     wandb_entity:str="",
     wandb_project:str="",
     save_steps:Optional[list[int]]=None,
     save_dir:Optional[str]=None,
     log_steps:Optional[int]=None,
-    activations_split_by_head:bool=False,
-    transcoder:bool=False,
     run_cfg:dict={},
     normalize_activations:bool=False,
-    verbose:bool=False,
     device:str="cuda",
     autocast_dtype: t.dtype = t.float32,
 ):
@@ -141,68 +123,55 @@ def trainSAE(
     device_type = "cuda" if "cuda" in device else "cpu"
     autocast_context = nullcontext() if device_type == "cpu" else t.autocast(device_type=device_type, dtype=autocast_dtype)
 
-    trainers = []
-    for i, config in enumerate(trainer_configs):
-        if "wandb_name" in config:
-            config["wandb_name"] = f"{config['wandb_name']}"
-        trainer_class = config["trainer"]
-        del config["trainer"]
-        trainers.append(trainer_class(**config))
 
-    wandb_processes = []
-    log_queues = []
+    if "wandb_name" in trainer_config:
+        trainer_config["wandb_name"] = f"{trainer_config['wandb_name']}"
+    trainer_class = trainer_config["trainer"]
+    del trainer_config["trainer"]
+    trainer = trainer_class(**trainer_config)
 
-    if use_wandb:
-        # Note: If encountering wandb and CUDA related errors, try setting start method to spawn in the if __name__ == "__main__" block
-        # https://docs.python.org/3/library/multiprocessing.html#multiprocessing.set_start_method
-        # Everything should work fine with the default fork method but it may not be as robust
-        for i, trainer in enumerate(trainers):
-            log_queue = mp.Queue()
-            log_queues.append(log_queue)
-            wandb_config = trainer.config | run_cfg
-            # Make sure wandb config doesn't contain any CUDA tensors
-            wandb_config = {k: v.cpu().item() if isinstance(v, t.Tensor) else v 
-                          for k, v in wandb_config.items()}
-            wandb_process = mp.Process(
-                target=new_wandb_process,
-                args=(wandb_config, log_queue, wandb_entity, wandb_project),
-            )
-            wandb_process.start()
-            wandb_processes.append(wandb_process)
+    if use_tensorboard:
+        metric_log_queue = mp.Queue()
+        wandb_config = trainer.config | run_cfg
+        # Make sure wandb config doesn't contain any CUDA tensors
+        wandb_config = {k: v.cpu().item() if isinstance(v, t.Tensor) else v
+                      for k, v in wandb_config.items()}
+        tensorboard_process = mp.Process(
+            target=new_training_logging_process,
+            args=(wandb_config, metric_log_queue, wandb_entity, wandb_project),
+        )
+        tensorboard_process.start()
 
-    # make save dirs, export config
+    # make save dir, export config
     if save_dir is not None:
-        save_dirs = [
-            os.path.join(save_dir, f"{trainer_config["wandb_name"]}") for trainer_config in trainer_configs
-        ]
-        for trainer, dir in zip(trainers, save_dirs):
-            os.makedirs(dir, exist_ok=True)
-            # save config
-            config = {"trainer": trainer.config}
-            try:
-                config["buffer"] = data.config
-            except:
-                pass
-            with open(os.path.join(dir, "config.json"), "w") as f:
-                json.dump(config, f, indent=4)
-    else:
-        save_dirs = [None for _ in trainer_configs]
+        save_dir = os.path.join(save_dir, f"{trainer_config["wandb_name"]}")
+        os.makedirs(save_dir, exist_ok=True)
+        # save config
+        config = {"trainer": trainer.config}
+        try:
+            config["buffer"] = data.config
+            # TODO swallows errors, very bad
+        except:
+            pass
+        with open(os.path.join(dir, "config.json"), "w") as f:
+            json.dump(config, f, indent=4)
 
     if normalize_activations:
         norm_factor = get_norm_factor(data, steps=100)
 
-        for trainer in trainers:
-            trainer.config["norm_factor"] = norm_factor
-            # Verify that all autoencoders have a scale_biases method
-            trainer.ae.scale_biases(1.0)
+        trainer.config["norm_factor"] = norm_factor
+        # Verify that all autoencoders have a scale_biases method
+        trainer.ae.scale_biases(1.0)
 
-
+    # TODO figure out what this is
     tokens_per_step = 1 if data.OUT_BATCH_SIZE_TOKENS is None else data.OUT_BATCH_SIZE_TOKENS
     if tokens_per_step == 1:
         unit = "it"
     else:
         unit = "tokens"
 
+
+    # Main Training Loop
     for step, act in enumerate(tqdm(data, total=steps, unit=unit, unit_scale=tokens_per_step, smoothing=0.7)):
 
         act = act.to(dtype=autocast_dtype)
@@ -214,51 +183,44 @@ def trainSAE(
             break
 
         # logging
-        if (use_wandb or verbose) and step % log_steps == 0:
-            log_stats(
-                trainers, step, act, activations_split_by_head, transcoder, log_queues=log_queues, verbose=verbose
+        if use_tensorboard and step % log_steps == 0:
+            log_metrics(
+                trainer, step, act, log_queue=metric_log_queue
             )
 
         # saving
         if save_steps is not None and step in save_steps:
-            for dir, trainer in zip(save_dirs, trainers):
-                if dir is not None:
+            if save_dir is not None:
+                if normalize_activations:
+                    # Temporarily scale up biases for checkpoint saving
+                    trainer.ae.scale_biases(norm_factor)
 
-                    if normalize_activations:
-                        # Temporarily scale up biases for checkpoint saving
-                        trainer.ae.scale_biases(norm_factor)
+                if not os.path.exists(os.path.join(dir, "checkpoints")):
+                    os.mkdir(os.path.join(dir, "checkpoints"))
 
-                    if not os.path.exists(os.path.join(dir, "checkpoints")):
-                        os.mkdir(os.path.join(dir, "checkpoints"))
+                checkpoint = {k: v.cpu() for k, v in trainer.ae.state_dict().items()}
+                t.save(
+                    checkpoint,
+                    os.path.join(dir, "checkpoints", f"ae_{step}.pt"),
+                )
 
-                    checkpoint = {k: v.cpu() for k, v in trainer.ae.state_dict().items()}
-                    t.save(
-                        checkpoint,
-                        os.path.join(dir, "checkpoints", f"ae_{step}.pt"),
-                    )
+                if normalize_activations:
+                    trainer.ae.scale_biases(1 / norm_factor)
 
-                    if normalize_activations:
-                        trainer.ae.scale_biases(1 / norm_factor)
-
-        torch.set_float32_matmul_precision('medium')
         # training
-        for trainer in trainers:
-            with autocast_context:
-                trainer.update(step, act)
+        with autocast_context:
+            trainer.update(step, act)
 
-    # save final SAEs
-    for save_dir, trainer in zip(save_dirs, trainers):
-        if normalize_activations:
-            trainer.ae.scale_biases(norm_factor)
-        if save_dir is not None:
-            final = {k: v.cpu() for k, v in trainer.ae.state_dict().items()}
-            t.save(final, os.path.join(save_dir, "ae.pt"))
+    # save final SAE
+    if normalize_activations:
+        trainer.ae.scale_biases(norm_factor)
+    if save_dir is not None:
+        final = {k: v.cpu() for k, v in trainer.ae.state_dict().items()}
+        t.save(final, os.path.join(save_dir, "ae.pt"))
 
-    # Signal wandb processes to finish
-    if use_wandb:
-        for queue in log_queues:
-            queue.put("DONE")
-        for process in wandb_processes:
-            process.join()
+    # Signal tensorboard process to finish
+    if use_tensorboard:
+        metric_log_queue.put("DONE")
+        tensorboard_process.join()
 
-    return trainers[0].ae
+    return trainer.ae
