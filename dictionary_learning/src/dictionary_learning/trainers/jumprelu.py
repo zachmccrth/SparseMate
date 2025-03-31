@@ -90,7 +90,7 @@ class JumpReluTrainer(nn.Module, SAETrainer):
         decay_start: Optional[int] = None,  # decay learning rate after this many steps
         target_l0: float = 20.0,
         device: str = "cpu",
-        wandb_name: str = "JumpRelu",
+        run_name: str = "JumpRelu",
         submodule_name: Optional[str] = None,
     ):
         super().__init__()
@@ -114,7 +114,7 @@ class JumpReluTrainer(nn.Module, SAETrainer):
         self.target_l0 = target_l0
 
         # TODO: Better auto-naming (e.g. in BatchTopK package)
-        self.wandb_name = wandb_name
+        self.run_name = run_name
 
         # TODO: Why not just pass in the initialised autoencoder instead?
         self.ae = dict_class(
@@ -222,7 +222,7 @@ class JumpReluTrainer(nn.Module, SAETrainer):
             "device": self.device,
             "layer": self.layer,
             "lm_name": self.lm_name,
-            "wandb_name": self.wandb_name,
+            "run_name": self.run_name,
             "submodule_name": self.submodule_name,
             "bandwidth": self.bandwidth,
             "sparsity_penalty": self.sparsity_coefficient,

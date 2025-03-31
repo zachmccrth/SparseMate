@@ -161,7 +161,7 @@ class TopKTrainer(SAETrainer):
         threshold_start_step: int = 1000,
         seed: Optional[int] = None,
         device: Optional[str] = None,
-        wandb_name: str = "AutoEncoderTopK",
+        run_name: str = "AutoEncoderTopK",
         submodule_name: Optional[str] = None,
     ):
         super().__init__(seed)
@@ -171,7 +171,7 @@ class TopKTrainer(SAETrainer):
         self.lm_name = lm_name
         self.submodule_name = submodule_name
 
-        self.wandb_name = wandb_name
+        self.run_name = run_name
         self.steps = steps
         self.decay_start = decay_start
         self.warmup_steps = warmup_steps
@@ -359,6 +359,6 @@ class TopKTrainer(SAETrainer):
             "device": self.device,
             "layer": self.layer,
             "lm_name": self.lm_name,
-            "wandb_name": self.wandb_name,
+            "run_name": self.run_name,
             "submodule_name": self.submodule_name,
         }

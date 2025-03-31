@@ -142,7 +142,7 @@ def trainSAE(
 
     # make save_dir, export config
     if save_dir is not None:
-        save_dir = os.path.join(save_dir, f"{trainer_config["wandb_name"]}")
+        save_dir = os.path.join(save_dir, f"{trainer_config["run_name"]}")
         os.makedirs(save_dir, exist_ok=True)
         # save config
         config = {"trainer": trainer.config}

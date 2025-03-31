@@ -3,10 +3,8 @@ import sys
 import numpy as np
 
 from SAE_Models.autoencoders import AutoEncoderDirectory
-from datasets.chessbench.bag_data import ChessBenchDataset
+from datasets import ChessBenchDataset
 from model_tools.truncated_leela import TruncatedModel
-from dictionary_learning.dictionary import *
-
 
 # Add the main project directory to sys.path
 project_dir = "/"
@@ -111,7 +109,6 @@ def write_to_db(dataset, autoencoder_config , table_name, total_boards_max, thre
     buffer_config  = autoencoder_config["buffer"]
 
 
-
     init_table(table_name)
 
     dataloader = DataLoader(dataset, batch_size=None, batch_sampler=None)
@@ -210,8 +207,8 @@ if __name__ == "__main__":
 
     last_model_run_config = autoencoder_directory.get_last_created_model()
     print(last_model_run_config)
-    table_name = last_model_run_config['trainer']["wandb_name"].replace('_', '').replace(':', '')
-    print(f"Writing the activations of {last_model_run_config['trainer']['wandb_name']} to {table_name} ")
+    table_name = last_model_run_config['trainer']["run_name"].replace('_', '').replace(':', '')
+    print(f"Writing the activations of {last_model_run_config['trainer']['run_name']} to {table_name} ")
 
 
     write_to_db(dataset=chessbench, table_name= table_name, autoencoder_config=last_model_run_config, total_boards_max=num_of_boards, threshold=0.001, device=device)

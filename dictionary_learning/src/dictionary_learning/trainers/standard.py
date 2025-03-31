@@ -27,7 +27,7 @@ class StandardTrainer(SAETrainer):
                  resample_steps:Optional[int]=None, # how often to resample neurons
                  seed:Optional[int]=None,
                  device=None,
-                 wandb_name:Optional[str]='StandardTrainer',
+                 run_name:Optional[str]='StandardTrainer',
                  submodule_name:Optional[str]=None,
     ):
         super().__init__(seed)
@@ -50,7 +50,7 @@ class StandardTrainer(SAETrainer):
         self.sparsity_warmup_steps = sparsity_warmup_steps
         self.steps = steps
         self.decay_start = decay_start
-        self.wandb_name = wandb_name
+        self.run_name = run_name
 
         if device is None:
             self.device = 'cuda' if t.cuda.is_available() else 'cpu'
@@ -167,7 +167,7 @@ class StandardTrainer(SAETrainer):
             'device' : self.device,
             'layer' : self.layer,
             'lm_name' : self.lm_name,
-            'wandb_name': self.wandb_name,
+            'run_name': self.run_name,
             'submodule_name': self.submodule_name,
         }
 
@@ -191,7 +191,7 @@ class StandardTrainerAprilUpdate(SAETrainer):
                  decay_start:Optional[int]=None, # decay learning rate after this many steps
                  seed:Optional[int]=None,
                  device=None,
-                 wandb_name:Optional[str]='StandardTrainerAprilUpdate',
+                 run_name:Optional[str]='StandardTrainerAprilUpdate',
                  submodule_name:Optional[str]=None,
     ):
         super().__init__(seed)
@@ -214,7 +214,7 @@ class StandardTrainerAprilUpdate(SAETrainer):
         self.sparsity_warmup_steps = sparsity_warmup_steps
         self.steps = steps
         self.decay_start = decay_start
-        self.wandb_name = wandb_name
+        self.run_name = run_name
 
         if device is None:
             self.device = 'cuda' if t.cuda.is_available() else 'cpu'
@@ -281,7 +281,7 @@ class StandardTrainerAprilUpdate(SAETrainer):
             'device' : self.device,
             'layer' : self.layer,
             'lm_name' : self.lm_name,
-            'wandb_name': self.wandb_name,
+            'run_name': self.run_name,
             'submodule_name': self.submodule_name,
         }
 

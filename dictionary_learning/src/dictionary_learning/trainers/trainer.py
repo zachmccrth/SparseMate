@@ -31,7 +31,7 @@ class SAETrainer:
     @property
     def config(self):
         return {
-            "wandb_name": "trainer",
+            "run_name": "trainer",
         }
 
 
