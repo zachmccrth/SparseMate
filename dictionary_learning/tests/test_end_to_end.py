@@ -128,7 +128,7 @@ def test_sae_training():
                 "decay_start": decay_start,  # when does the lr decay start
                 "steps": steps,  # when when does training end
                 "seed": RANDOM_SEED,
-                "wandb_name": f"TopKTrainer-{MODEL_NAME}-{submodule_name}",
+                "run_name": f"TopKTrainer-{MODEL_NAME}-{submodule_name}",
                 "device": DEVICE,
                 "layer": LAYER,
                 "lm_name": MODEL_NAME,
@@ -151,7 +151,7 @@ def test_sae_training():
                 "steps": steps,
                 "resample_steps": resample_steps,
                 "seed": RANDOM_SEED,
-                "wandb_name": f"StandardTrainer-{MODEL_NAME}-{submodule_name}",
+                "run_name": f"StandardTrainer-{MODEL_NAME}-{submodule_name}",
                 "layer": LAYER,
                 "lm_name": MODEL_NAME,
                 "device": DEVICE,

@@ -27,7 +27,7 @@ class GatedSAETrainer(SAETrainer):
                  decay_start:Optional[int]=None, # decay learning rate after this many steps
                  seed: Optional[int] = None,
                  device: Optional[str] = None,
-                 wandb_name: Optional[str] = 'GatedSAETrainer',
+                 run_name: Optional[str] = 'GatedSAETrainer',
                  submodule_name: Optional[str] = None,
     ):
         super().__init__(seed)
@@ -49,7 +49,7 @@ class GatedSAETrainer(SAETrainer):
         self.warmup_steps = warmup_steps
         self.sparsity_warmup_steps = sparsity_warmup_steps
         self.decay_start = decay_start
-        self.wandb_name = wandb_name
+        self.run_name = run_name
 
         if device is None:
             self.device = 'cuda' if t.cuda.is_available() else 'cpu'
@@ -121,6 +121,6 @@ class GatedSAETrainer(SAETrainer):
             'device' : self.device,
             'layer' : self.layer,
             'lm_name' : self.lm_name,
-            'wandb_name': self.wandb_name,
+            'run_name': self.run_name,
             'submodule_name': self.submodule_name,
         }

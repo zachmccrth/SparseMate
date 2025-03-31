@@ -16,7 +16,7 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 def new_training_logging_process(config, metric_queue):
-    writer = SummaryWriter(filename_suffix=config["wandb_name"])
+    writer = SummaryWriter(filename_suffix=config["run_name"])
     while True:
         try:
             metric_log = metric_queue.get(timeout=1)
@@ -125,8 +125,8 @@ def trainSAE(
     autocast_context = nullcontext() if device_type == "cpu" else t.autocast(device_type=device_type, dtype=autocast_dtype)
 
 
-    if "wandb_name" in trainer_config:
-        trainer_config["wandb_name"] = f"{trainer_config['wandb_name']}"
+    if "run_name" in trainer_config:
+        trainer_config["run_name"] = f"{trainer_config['run_name']}"
     trainer_class = trainer_config["trainer"]
     del trainer_config["trainer"]
     trainer = trainer_class(**trainer_config)
@@ -145,7 +145,7 @@ def trainSAE(
 
     # make save_dir, export config
     if save_dir is not None:
-        save_dir = os.path.join(save_dir, f"{trainer_config["wandb_name"]}")
+        save_dir = os.path.join(save_dir, f"{trainer_config["run_name"]}")
         os.makedirs(save_dir, exist_ok=True)
         # save config
         config = {"trainer": trainer.config}

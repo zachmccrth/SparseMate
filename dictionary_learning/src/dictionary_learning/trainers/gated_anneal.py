@@ -35,7 +35,7 @@ class GatedAnnealTrainer(SAETrainer):
                  resample_steps: Optional[int] = None, # number of steps after which to resample dead neurons
                  device: Optional[str] = None,
                  seed: Optional[int] = 42,
-                 wandb_name: str = 'GatedAnnealTrainer',
+                 run_name: str = 'GatedAnnealTrainer',
     ):
         super().__init__(seed)
 
@@ -86,7 +86,7 @@ class GatedAnnealTrainer(SAETrainer):
         self.steps = steps
         self.logging_parameters = ['p', 'next_p', 'lp_loss', 'scaled_lp_loss', 'sparsity_coeff']
         self.seed = seed
-        self.wandb_name = wandb_name
+        self.run_name = run_name
 
         self.resample_steps = resample_steps
         if self.resample_steps is not None:
@@ -226,7 +226,7 @@ class GatedAnnealTrainer(SAETrainer):
     #         'l1_penalty' : self.l1_penalty,
     #         'warmup_steps' : self.warmup_steps,
     #         'device' : self.device,
-    #         'wandb_name': self.wandb_name,
+    #         'run_name': self.run_name,
     #     }
         
     @property
@@ -252,5 +252,5 @@ class GatedAnnealTrainer(SAETrainer):
             'seed' : self.seed,
             'layer' : self.layer,
             'lm_name' : self.lm_name,
-            'wandb_name' : self.wandb_name,
+            'run_name' : self.run_name,
         }

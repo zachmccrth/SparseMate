@@ -2,7 +2,6 @@ from datetime import datetime
 import sys
 
 from model_tools.truncated_leela import TruncatedModel
-import torch
 from datasets import ChessBenchDataset
 from dictionary_learning.dictionary import *
 from dictionary_learning.buffer import LeelaImpActivationBuffer
@@ -66,7 +65,7 @@ if __name__ == '__main__':
         "steps": steps,
         "layer": layer,
         "lm_name": "leela",
-        "wandb_name": f"{trainer_class.__name__}_{datetime.now().strftime('%m%d_%H:%M')}",
+        "run_name": f"{trainer_class.__name__}_{datetime.now().strftime('%m%d_%H:%M')}",
         "device": str(device),
         "target_l0": 40,
         "sparsity_warmup_steps": sparsity_warmup_steps,

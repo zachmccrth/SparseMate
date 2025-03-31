@@ -104,7 +104,7 @@ def write_to_db(dataset, autoencoder_config ,total_boards_max, threshold=0.0001,
     buffer_config  = autoencoder_config["buffer"]
 
 
-    table_name = trainer_config["wandb_name"].replace('_', '').replace(':','')
+    table_name = trainer_config["run_name"].replace('_', '').replace(':','')
     init_table(table_name)
 
     dataloader = DataLoader(dataset, batch_size=None, batch_sampler=None)
@@ -195,7 +195,7 @@ def write_to_db(dataset, autoencoder_config ,total_boards_max, threshold=0.0001,
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    num_of_boards = 20
+    num_of_boards = 1000
 
     chessbench = ChessBenchDataset()
 
