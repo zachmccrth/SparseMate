@@ -72,29 +72,36 @@ def get_db_conn():
     conn = sqlite3.connect("/home/zachary/PycharmProjects/SparseMate/SparseMate.sqlite")
     return conn
 
-def init_table(table_name):
 
+def init_table(table_name):
+    """
+    Drops the table if it exists and recreates it.
+    """
     # Initialize SQLite database and create table
     conn = get_db_conn()
     cursor = conn.cursor()
 
-    # Create the table
+    # Drop the table if it exists
+    drop_table = f"DROP TABLE IF EXISTS {table_name}"
+    cursor.execute(drop_table)
+
+    # Create the table again
     create_table = f"""
-    CREATE TABLE IF NOT EXISTS {table_name} (
+    CREATE TABLE {table_name} (
         fen TEXT,
         sq TEXT,
         feature INTEGER,
         value REAL
     )
     """
-
     cursor.execute(create_table)
-    conn.commit()
 
+    conn.commit()
     conn.close()
 
+
 # Loop through buffer and insert data into the database
-def write_to_db(dataset, autoencoder_config ,total_boards_max, threshold=0.0001, device=torch.device("cpu")):
+def write_to_db(dataset, autoencoder_config , table_name, total_boards_max, threshold=0.0001, device=torch.device("cpu")):
     """
     Takes a dataset and a model and evaluates the feature activations.
     """
@@ -104,7 +111,7 @@ def write_to_db(dataset, autoencoder_config ,total_boards_max, threshold=0.0001,
     buffer_config  = autoencoder_config["buffer"]
 
 
-    table_name = trainer_config["wandb_name"].replace('_', '').replace(':','')
+
     init_table(table_name)
 
     dataloader = DataLoader(dataset, batch_size=None, batch_sampler=None)
@@ -114,7 +121,7 @@ def write_to_db(dataset, autoencoder_config ,total_boards_max, threshold=0.0001,
     # Have mercy for two config subfiles, something needs to change
     submodule_class =  trainer_config["submodule_name"]
     if submodule_class == "TruncatedModel":
-        submodule: TruncatedModel = TruncatedModel(onnx_model_path)
+        submodule: TruncatedModel = TruncatedModel(onnx_model_path, layer=trainer_config["layer"])
     else:
         raise Exception("Your lazy dev has not yet implemented submodules other than TruncatedModel")
 
@@ -195,14 +202,17 @@ def write_to_db(dataset, autoencoder_config ,total_boards_max, threshold=0.0001,
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    num_of_boards = 20
+    num_of_boards = 1000
 
     chessbench = ChessBenchDataset()
 
     autoencoder_directory = AutoEncoderDirectory()
 
     last_model_run_config = autoencoder_directory.get_last_created_model()
+    print(last_model_run_config)
+    table_name = last_model_run_config['trainer']["wandb_name"].replace('_', '').replace(':', '')
+    print(f"Writing the activations of {last_model_run_config['trainer']['wandb_name']} to {table_name} ")
 
 
-    write_to_db(dataset=chessbench, autoencoder_config=last_model_run_config, total_boards_max=num_of_boards, threshold=0.001, device=device)
+    write_to_db(dataset=chessbench, table_name= table_name, autoencoder_config=last_model_run_config, total_boards_max=num_of_boards, threshold=0.001, device=device)
 

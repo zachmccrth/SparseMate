@@ -15,8 +15,8 @@ from tqdm import tqdm
 
 from torch.utils.tensorboard import SummaryWriter
 
-def new_training_logging_process(config, metric_queue):
-    writer = SummaryWriter(filename_suffix=config["wandb_name"])
+def new_training_logging_process(run_name, config, metric_queue):
+    writer = SummaryWriter(filename_suffix=run_name)
     while True:
         try:
             metric_log = metric_queue.get(timeout=1)
@@ -101,8 +101,6 @@ def trainSAE(
     trainer_config: dict,
     steps: int,
     use_tensorboard:bool=False,
-    wandb_entity:str="",
-    wandb_project:str="",
     save_steps:Optional[list[int]]=None,
     save_dir:Optional[str]=None,
     log_steps:Optional[int]=None,
@@ -125,13 +123,12 @@ def trainSAE(
     autocast_context = nullcontext() if device_type == "cpu" else t.autocast(device_type=device_type, dtype=autocast_dtype)
 
 
-    if "wandb_name" in trainer_config:
-        trainer_config["wandb_name"] = f"{trainer_config['wandb_name']}"
     trainer_class = trainer_config["trainer"]
     del trainer_config["trainer"]
     trainer = trainer_class(**trainer_config)
 
     if use_tensorboard:
+        run_name = trainer_config["wandb_name"]
         metric_log_queue = mp.Queue()
         wandb_config = trainer.config | run_cfg
         # Make sure wandb config doesn't contain any CUDA tensors
@@ -139,7 +136,7 @@ def trainSAE(
                       for k, v in wandb_config.items()}
         tensorboard_process = mp.Process(
             target=new_training_logging_process,
-            args=(wandb_config, metric_log_queue),
+            args=(run_name, wandb_config, metric_log_queue),
         )
         tensorboard_process.start()
 
@@ -197,7 +194,7 @@ def trainSAE(
                     trainer.ae.scale_biases(norm_factor)
 
                 if not os.path.exists(os.path.join(save_dir, "checkpoints")):
-                    os.mkdir(os.path.join(dir, "checkpoints"))
+                    os.mkdir(os.path.join(save_dir, "checkpoints"))
 
                 checkpoint = {k: v.cpu() for k, v in trainer.ae.state_dict().items()}
                 t.save(

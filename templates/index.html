@@ -8,18 +8,15 @@
         body {
             font-family: Arial, sans-serif;
         }
-
         h1 {
             text-align: center;
         }
-
         #heatmaps {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 20px;
             margin-top: 20px;
         }
-
         .heatmap-item {
             text-align: center;
             border: 1px solid #ccc;
@@ -27,13 +24,11 @@
             padding: 10px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
-
         .heatmap-item img {
             max-width: 100%;
             height: auto;
             border-radius: 5px;
         }
-
         .fen {
             font-weight: bold;
             margin-bottom: 10px;
@@ -41,49 +36,51 @@
             max-width: 100%;
             color: #555;
         }
-
-        .moves, .themes {
-            font-size: 12px;
-            color: #555;
-            margin-top: 5px;
-        }
     </style>
 </head>
 <body>
     <h1>Chess Feature Heatmaps</h1>
-    <label for="features">Select Feature:</label>
-    <select id="features">
-        {% for feature in features %}
-            <option value="{{ feature }}">{{ feature }}</option>
+
+    <label for="tables">Select Table:</label>
+    <select id="tables" onchange="updateFeatures()">
+        {% for table in tables %}
+            <option value="{{ table }}">{{ table }}</option>
         {% endfor %}
     </select>
+
+    <label for="features">Select Feature:</label>
+    <select id="features"></select>
+
     <button onclick="generateHeatmap()">Generate Heatmap</button>
-    <button onclick="navigateFeature(-1)">Previous Feature</button>
-    <button onclick="navigateFeature(1)">Next Feature</button>
+
     <div id="heatmaps"></div>
 
     <script>
-        let currentIndex = 0;
-        const features = Array.from(document.getElementById('features').options).map(opt => opt.value);
-
-        function updateFeatureSelection(index) {
-            if (index >= 0 && index < features.length) {
-                currentIndex = index;
-                document.getElementById('features').value = features[currentIndex];
-                generateHeatmap();
-            }
-        }
-
-        function navigateFeature(direction) {
-            updateFeatureSelection(currentIndex + direction);
+        async function updateFeatures() {
+            const tableName = document.getElementById('tables').value;
+            const response = await fetch('/features', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ table_name: tableName })
+            });
+            const data = await response.json();
+            const featuresSelect = document.getElementById('features');
+            featuresSelect.innerHTML = "";
+            data.features.forEach(feature => {
+                const option = document.createElement('option');
+                option.value = feature;
+                option.textContent = feature;
+                featuresSelect.appendChild(option);
+            });
         }
 
         async function generateHeatmap() {
+            const tableName = document.getElementById('tables').value;
             const featureId = document.getElementById('features').value;
             const response = await fetch('/heatmap', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ feature_id: featureId })
+                body: JSON.stringify({ table_name: tableName, feature_id: featureId })
             });
             const data = await response.json();
             const heatmapsDiv = document.getElementById('heatmaps');
@@ -100,25 +97,13 @@
                 const imgElement = document.createElement('img');
                 imgElement.src = 'data:image/png;base64,' + item.image;
 
-                const movesDiv = document.createElement('div');
-                movesDiv.textContent = `Moves: ${item.moves}`;
-
-                const themesDiv = document.createElement('div');
-                themesDiv.textContent = `Themes: ${item.themes}`;
-
                 heatmapItem.appendChild(fenDiv);
                 heatmapItem.appendChild(imgElement);
-                heatmapItem.appendChild(movesDiv);
-                heatmapItem.appendChild(themesDiv);
                 heatmapsDiv.appendChild(heatmapItem);
             });
         }
 
-
-        document.getElementById('features').addEventListener('change', () => {
-            currentIndex = features.indexOf(document.getElementById('features').value);
-            generateHeatmap();
-        });
+        document.addEventListener('DOMContentLoaded', updateFeatures);
     </script>
 </body>
 </html>

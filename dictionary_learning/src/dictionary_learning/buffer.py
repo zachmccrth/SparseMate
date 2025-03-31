@@ -6,6 +6,8 @@ import torch.multiprocessing as mp
 import queue
 
 
+
+
 def _background_buffer_filler(
         cfg,  # dictionary with config info
         data_q: mp.Queue,
@@ -18,7 +20,8 @@ def _background_buffer_filler(
     and pushes them onto the data_q for the main process to consume.
     """
 
-    submodule = TruncatedModel(onnx_model_path=cfg['onnx_model_path'], device=device)
+    layer = cfg['layer']
+    submodule = TruncatedModel(onnx_model_path=cfg['onnx_model_path'],layer=int(layer) ,device=device)
     submodule.eval()  # Ensure it's in evaluation mode
     dataset_class = cfg['dataset_class']
     dataset = dataset_class()
@@ -62,12 +65,11 @@ def _background_buffer_filler(
             break
 
     print("Background filler process: done_event is set. Exiting.")
-
-
 class LeelaImpActivationBuffer:
     def __init__(self,
                  dataset_class,
                  onnx_model_path,
+                 layer,
                  d_submodule=768,
                  io='out',
                  n_ctxs=4000,
@@ -86,7 +88,6 @@ class LeelaImpActivationBuffer:
         self.device = device
         self.dtype = dtype
 
-
         self.size_of_buffer_in_boards = n_ctxs
         self.BOARD_SIZE = 64
         self.SIZE_OF_BUFFER_IN_TOKENS = n_ctxs * self.BOARD_SIZE
@@ -103,7 +104,6 @@ class LeelaImpActivationBuffer:
             self.SIZE_OF_BUFFER_IN_TOKENS, d_submodule,
             device=device, dtype=self.dtype
         )
-
 
         self.onnx_model_path = onnx_model_path
 
@@ -125,6 +125,7 @@ class LeelaImpActivationBuffer:
             BOARD_SIZE=self.BOARD_SIZE,
             refresh_batch_size_boards=self.refresh_batch_size_boards,
             onnx_model_path=onnx_model_path,
+            layer=layer,
         )
 
         # Start the worker process

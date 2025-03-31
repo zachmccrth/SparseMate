@@ -1,8 +1,12 @@
-
+from onnx import helper, TensorProto
 import numpy as np
+import onnx
 import torch.nn as nn
 import onnx2torch
 import torch
+import os
+
+from torchviz import make_dot
 
 from leela_interp.core.leela_board import LeelaBoard
 
@@ -10,7 +14,7 @@ class TruncatedModel(nn.Module):
     """
     Creates the submodule to peek into the residual stream. Currently hardcoded to layer 6 until I decide to be better than that
     """
-    def __init__(self, onnx_model_path, device=torch.device("cpu")):
+    def __init__(self, onnx_model_path, layer, device=torch.device("cpu")):
         super(TruncatedModel, self).__init__()
 
         self.device = device
@@ -24,7 +28,7 @@ class TruncatedModel(nn.Module):
             new_node = new_graph.node_copy(node, lambda n: env[n])
             env[node] = new_node
 
-            if node.target == f"encoder6/ln2":
+            if node.target == f"encoder{layer}/ln2":
                 break  # Stop copying nodes once you reach the split point
 
         # Specify the new output
@@ -47,34 +51,57 @@ class TruncatedModel(nn.Module):
         )
 
 
-    def export2onnx(self, onnx_model_path):
-        # Dummy input matching the model's input size
-        dummy_input = torch.randn(64, 768)  # Example for an image model like ResNet
+class SingleLayer(nn.Module):
+    def __init__(self, onnx_model_path, layer, device=torch.device("cpu")):
+        super(SingleLayer, self).__init__()
+        self.device = device
 
-        # Export the model
-        torch.onnx.export(
-            self,  # Your PyTorch model
-            dummy_input,  # Example input tensor
-            "model.onnx",  # Output ONNX file name
-            export_params=True,  # Store the trained parameters in the model file
-            opset_version=11,  # ONNX version (TensorRT supports versions 7-13)
-            do_constant_folding=True,  # Optimize constant folding
-            input_names=["input"],  # Input names
-            output_names=["output"]  # Output names
-        )
+        lc0: torch.fx.GraphModule = onnx2torch.convert(onnx_model_path)
+        new_graph = torch.fx.Graph()
+        env = {}  # A mapping of original nodes to new nodes in the subgraph
+
+        # Create a new input node (this will replace the input to encoder{layer})
+        input_node = new_graph.placeholder("new_input")
+        def get_or_copy(n):
+            """Copy nodes, but replace inputs to layer 6 with new inputs."""
+            if n not in env:
+                if n.op == "placeholder":
+                    # Replace the original input with our new input
+                    env[n] = input_node
+                else:
+                    env[n] = new_graph.node_copy(n, lambda x: get_or_copy(x))
+            return env[n]
+
+        # Copy only nodes belonging to layer 6 and beyond
+        for node in lc0.graph.nodes:
+            if isinstance(node.target, str) and node.target.startswith(f"encoder{layer}"):
+                env[node] = new_graph.node_copy(node, get_or_copy)
+                last_node = env[node]
+
+        new_graph.output(last_node)
+        self.submodule = torch.fx.GraphModule(lc0, new_graph).to(self.device)
+
+        # Won't be trained, inference only
+        self.requires_grad_(False)
+
+    def forward(self, x):
+        return self.submodule(x)
+
 
 
 if __name__ == "__main__":
-    layer_n = 6  # Number of layers you want to retain
-    # Load ONNX model
+    layer_n = 6  # Layer to extract
     onnx_model_path = "/home/zachary/PycharmProjects/leela-interp/lc0.onnx"
 
-    board = [LeelaBoard.from_fen("8/8/8/pK3k2/P7/8/8/8 b - - 1 59")]
-    torch.set_float32_matmul_precision("high")
-    truncated = torch.compile(TruncatedModel(onnx_model_path))
+    model = SingleLayer(onnx_model_path=onnx_model_path, layer=layer_n, device=torch.device("cpu"))
 
-    input_tensor = truncated.make_inputs(board)
+    dummy = torch.randn(64, 768)  # Match expected input shape
+    output = model(dummy)  # Get the model's actual output
+    for node in model.submodule.graph.nodes:
+        if node.op == "placeholder":
+            print(f"Input Node: {node.name}, Shape: {node.meta.get('tensor_meta', 'Unknown')}")
 
-    trunc = truncated(input_tensor)
+    dot = make_dot(output, params=dict(model.named_parameters()))
+    dot.render("Single_Layer_Computation", format="png", view=True)
 
-    print(trunc.shape)
+
