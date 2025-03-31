@@ -1,2 +1,2 @@
-from .lichess_puzzles.puzzles import PuzzleDataset
-from .chessbench.bag_data import ChessBenchDataset
+from .datasetsAPI import DatasetsAPI
+import datasets.datasets_data

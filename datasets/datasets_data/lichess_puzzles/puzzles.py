@@ -2,12 +2,15 @@ import itertools
 from typing import Iterable
 
 import numpy as np
-import torch
+import torch.utils.data
 import csv
+
+from datasets import DatasetsAPI
 
 from leela_interp.core.leela_board import LeelaBoard
 
-#TODO multiuse functionality (I would like to be able to output LeelaBoards, tensors, etc)
+
+@DatasetsAPI.register('PuzzleDataset')
 class PuzzleDataset(torch.utils.data.IterableDataset):
     def __init__(self, file_path, ):
         self.device = None
@@ -15,6 +18,7 @@ class PuzzleDataset(torch.utils.data.IterableDataset):
 
     def preprocess(self, row):
         return LeelaBoard.from_fen(row["FEN"])
+
 
     def get_embedding(self, boards):
         if isinstance(boards, Iterable) and not isinstance(boards, LeelaBoard):
