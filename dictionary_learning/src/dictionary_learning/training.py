@@ -128,7 +128,7 @@ def trainSAE(
     trainer = trainer_class(**trainer_config)
 
     if use_tensorboard:
-        run_name = trainer_config["wandb_name"]
+        run_name = trainer_config["run_name"]
         metric_log_queue = mp.Queue()
         wandb_config = trainer.config | run_cfg
         # Make sure wandb config doesn't contain any CUDA tensors

@@ -3,8 +3,10 @@ import sys
 import numpy as np
 
 from SAE_Models.autoencoders import AutoEncoderDirectory
-from datasets import ChessBenchDataset
+from datasets.datasets_data import ChessBenchDataset
 from model_tools.truncated_leela import TruncatedModel
+from dictionary_learning.dictionary import *
+
 
 # Add the main project directory to sys.path
 project_dir = "/"
@@ -204,6 +206,8 @@ if __name__ == "__main__":
     chessbench = ChessBenchDataset()
 
     autoencoder_directory = AutoEncoderDirectory()
+
+
 
     last_model_run_config = autoencoder_directory.get_last_created_model()
     print(last_model_run_config)

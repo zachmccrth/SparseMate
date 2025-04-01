@@ -8,7 +8,7 @@ if project_dir not in sys.path:
     sys.path.insert(0, project_dir)  # Insert at the beginning to give it precedence
 
 from model_tools.truncated_leela import TruncatedModel
-from datasets import ChessBenchDataset
+from datasets.datasets_data import ChessBenchDataset
 from dictionary_learning.dictionary import *
 from dictionary_learning.buffer import LeelaImpActivationBuffer
 from dictionary_learning.training import trainSAE
@@ -24,16 +24,16 @@ if __name__ == '__main__':
     autoencoder_class = JumpReluAutoEncoder
 
     tokens_per_step = 2**12
-    boards_to_train_on = 1_000_000
-    sparsity_warmup_boards = 1_000_000 - 1_000
+    boards_to_train_on = 1_000_00
+    sparsity_warmup_boards = boards_to_train_on - 1_000
 
     steps = (boards_to_train_on * 64)// tokens_per_step
     save_interval = 5_000
 
-    layer = 6
+    layer = 2
 
     RESIDUAL_STREAM_DIM = 768
-    autoencoder_dim = 2**5 * RESIDUAL_STREAM_DIM
+    autoencoder_dim = 2**4 * RESIDUAL_STREAM_DIM
     
 
     print(f"Training on {boards_to_train_on * 64:,} tokens ({boards_to_train_on:,} boards) in {steps:,} training steps")
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         "target_l0": 20,
         "sparsity_warmup_steps": sparsity_warmup_steps,
         "warmup_steps": sparsity_warmup_steps,
-        "sparsity_penalty" : 0.1,
+        "sparsity_penalty" : 0.01,
         "submodule_name": TruncatedModel.__name__,
         "lr": 5e-4
     }
