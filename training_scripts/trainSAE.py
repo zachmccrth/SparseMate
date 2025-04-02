@@ -14,6 +14,7 @@ from dictionary_learning.buffer import LeelaImpActivationBuffer
 from dictionary_learning.training import trainSAE
 import torch.multiprocessing as mp
 from dictionary_learning.trainers import *
+import os
 
 if __name__ == '__main__':
 
@@ -60,6 +61,7 @@ if __name__ == '__main__':
         layer=layer,
     )
 
+    run_name= f"{datetime.now().strftime('%m%d_%H:%M')}_{trainer_class.__name__}"
 
     trainer_cfg = {
         "trainer": trainer_class,
@@ -69,14 +71,15 @@ if __name__ == '__main__':
         "steps": steps,
         "layer": layer,
         "lm_name": "leela",
-        "run_name": f"{datetime.now().strftime('%m%d_%H:%M')}_{trainer_class.__name__}",
+        "run_name": run_name,
         "device": str(device),
         "target_l0": 20,
         "sparsity_warmup_steps": sparsity_warmup_steps,
         "warmup_steps": sparsity_warmup_steps,
         "sparsity_penalty" : 0.02,
         "submodule_name": TruncatedModel.__name__,
-        "lr": 5e-4
+        "lr": 5e-4,
+        "log_dir": os.path.join("SAE_Models",os.path.join(run_name, "run_logs"))
     }
 
     # train the sparse autoencoder (SAE)
