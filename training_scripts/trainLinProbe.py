@@ -2,6 +2,11 @@ import os
 import sys
 from datetime import datetime
 
+project_dir = "/home/zachary/PycharmProjects/SparseMate"
+if project_dir not in sys.path:
+    sys.path.insert(0, project_dir)
+
+
 import chess
 import torch
 import torch.nn as nn
@@ -9,13 +14,10 @@ from torch.utils.data import DataLoader, IterableDataset
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from datasets.datasets_data.chessbench.bag_data import ChessBenchDataset
+from datasets.datasets_data import ChessBenchDataset
 from leela_interp.core.leela_board import LeelaBoard
 from model_tools.truncated_leela import TruncatedModel
 
-project_dir = "/home/zachary/PycharmProjects/SparseMate"
-if project_dir not in sys.path:
-    sys.path.insert(0, project_dir)
 
 
 class LinearClassifierNoBias(nn.Module):
@@ -81,8 +83,8 @@ if __name__ == "__main__":
     model_class = LinearClassifierNoBias
     criterion = nn.BCEWithLogitsLoss()
 
-    batch_size = 128
-    boards_to_train_on = 10
+    batch_size = 8192
+    boards_to_train_on = 100_000
     steps = (boards_to_train_on * 64) // batch_size
     layer = 2
     RESIDUAL_STREAM_DIM = 768
@@ -112,7 +114,7 @@ if __name__ == "__main__":
         device=device
     )
 
-    dataset = PieceClassificationDataset(base_dataset, submodule, chess.BISHOP)
+    dataset = PieceClassificationDataset(base_dataset, submodule, chess.PAWN)
     dataloader = DataLoader(dataset=dataset, batch_size=run_config["batch_size"])
 
     train_probe(run_config, dataloader, criterion, device)
