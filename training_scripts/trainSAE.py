@@ -63,6 +63,8 @@ if __name__ == '__main__':
 
     run_name= f"{datetime.now().strftime('%m%d_%H:%M')}_{trainer_class.__name__}"
 
+    print(f"Starting run: {run_name}")
+
     trainer_cfg = {
         "trainer": trainer_class,
         "dict_class": autoencoder_class,
