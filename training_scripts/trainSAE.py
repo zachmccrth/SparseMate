@@ -27,7 +27,7 @@ if __name__ == '__main__':
     boards_to_train_on = 500_000
     sparsity_warmup_boards = boards_to_train_on - 1_000
 
-    steps = (boards_to_train_on * 64)// tokens_per_step
+    steps = (boards_to_train_on * 64)  // tokens_per_step
     save_interval = 5_000
 
     layer = 2
