@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
     last_model_run_config = autoencoder_directory.get_last_created_model()
     print(last_model_run_config)
-    table_name = last_model_run_config['trainer']["run_name"].replace('_', '').replace(':', '')
+    table_name = f"RUN_{last_model_run_config['trainer']["run_name"].replace('_', '').replace(':', '')}"
     print(f"Writing the activations of {last_model_run_config['trainer']['run_name']} to {table_name} ")
 
 

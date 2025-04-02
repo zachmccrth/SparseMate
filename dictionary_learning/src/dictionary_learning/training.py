@@ -16,7 +16,7 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 def new_training_logging_process(run_name, config, metric_queue):
-    writer = SummaryWriter(filename_suffix=run_name)
+    writer = SummaryWriter(log_dir=str(os.path.join(config["log_dir"], run_name)))
     while True:
         try:
             metric_log = metric_queue.get(timeout=1)
@@ -130,13 +130,13 @@ def trainSAE(
     if use_tensorboard:
         run_name = trainer_config["run_name"]
         metric_log_queue = mp.Queue()
-        wandb_config = trainer.config | run_cfg
+        logging_config = trainer.config | run_cfg
         # Make sure wandb config doesn't contain any CUDA tensors
-        wandb_config = {k: v.cpu().item() if isinstance(v, t.Tensor) else v
-                      for k, v in wandb_config.items()}
+        logging_config = {k: v.cpu().item() if isinstance(v, t.Tensor) else v
+                      for k, v in logging_config.items()}
         tensorboard_process = mp.Process(
             target=new_training_logging_process,
-            args=(run_name, wandb_config, metric_log_queue),
+            args=(run_name, logging_config, metric_log_queue),
         )
         tensorboard_process.start()
 

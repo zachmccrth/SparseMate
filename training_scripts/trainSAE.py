@@ -24,7 +24,7 @@ if __name__ == '__main__':
     autoencoder_class = JumpReluAutoEncoder
 
     tokens_per_step = 2**12
-    boards_to_train_on = 1_000_00
+    boards_to_train_on = 500_000
     sparsity_warmup_boards = boards_to_train_on - 1_000
 
     steps = (boards_to_train_on * 64)// tokens_per_step
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         "target_l0": 20,
         "sparsity_warmup_steps": sparsity_warmup_steps,
         "warmup_steps": sparsity_warmup_steps,
-        "sparsity_penalty" : 0.01,
+        "sparsity_penalty" : 0.02,
         "submodule_name": TruncatedModel.__name__,
         "lr": 5e-4
     }
