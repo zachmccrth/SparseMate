@@ -69,7 +69,7 @@ if __name__ == '__main__':
         "steps": steps,
         "layer": layer,
         "lm_name": "leela",
-        "run_name": f"{trainer_class.__name__}_{datetime.now().strftime('%m%d_%H:%M')}",
+        "run_name": f"{datetime.now().strftime('%m%d_%H:%M')}_{trainer_class.__name__}",
         "device": str(device),
         "target_l0": 20,
         "sparsity_warmup_steps": sparsity_warmup_steps,
