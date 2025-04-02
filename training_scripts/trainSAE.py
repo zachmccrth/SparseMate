@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     activation_buffer = LeelaImpActivationBuffer(
         dataset_class=dataset_class,
-        onnx_model_path="/home/zachary/PycharmProjects/leela-interp/lc0.onnx",
+        onnx_model_path="/home/zachary/PycharmProjects/SparseMate/lc0.onnx",
         d_submodule=RESIDUAL_STREAM_DIM,
         device=device,
         out_batch_size= tokens_per_step,

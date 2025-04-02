@@ -1,12 +1,7 @@
-from onnx import helper, TensorProto
 import numpy as np
-import onnx
 import torch.nn as nn
 import onnx2torch
 import torch
-import os
-
-from torchviz import make_dot
 
 from leela_interp.core.leela_board import LeelaBoard
 
@@ -91,7 +86,7 @@ class SingleLayer(nn.Module):
 
 if __name__ == "__main__":
     layer_n = 6  # Layer to extract
-    onnx_model_path = "/home/zachary/PycharmProjects/leela-interp/lc0.onnx"
+    onnx_model_path = "/home/zachary/PycharmProjects/SparseMate/lc0.onnx"
 
     model = SingleLayer(onnx_model_path=onnx_model_path, layer=layer_n, device=torch.device("cpu"))
 
@@ -101,7 +96,5 @@ if __name__ == "__main__":
         if node.op == "placeholder":
             print(f"Input Node: {node.name}, Shape: {node.meta.get('tensor_meta', 'Unknown')}")
 
-    dot = make_dot(output, params=dict(model.named_parameters()))
-    dot.render("Single_Layer_Computation", format="png", view=True)
 
 
