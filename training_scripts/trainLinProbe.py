@@ -2,6 +2,8 @@ import os
 import sys
 from datetime import datetime
 
+import numpy as np
+
 project_dir = "/home/zachary/PycharmProjects/SparseMate"
 if project_dir not in sys.path:
     sys.path.insert(0, project_dir)
@@ -18,32 +20,67 @@ from tqdm import tqdm
 from datasets.datasets_data import ChessBenchDataset
 from leela_interp.core.leela_board import LeelaBoard
 from model_tools.truncated_leela import TruncatedModel
-
+import numpy as np
 
 
 class LinearClassifierNoBias(nn.Module):
-    def __init__(self, input_dim=768):
+    def __init__(self, input_dim=768, device=torch.device("cpu")):
         super().__init__()
-        self.linear = nn.Linear(input_dim, 1, bias=False)
+        self.linear = nn.Linear(input_dim, 1, bias=False, device=device)
 
     def forward(self, x):
         return self.linear(x)
 
 
 class PieceClassificationDataset(IterableDataset):
-    def __init__(self, base_dataset, submodule, piece_type: int):
+    def __init__(self, base_dataset, submodule, piece_type: int, buffer_size=10, device=torch.device("cpu")):
         super().__init__()
         self.base_dataset = base_dataset
         self.submodule = submodule
         self.piece_type = piece_type
+        self.buffer_size = buffer_size
+        self.device = device
+        self.dataset_iterator = iter(self.base_dataset)
+        self.data_buffer = None
+        self.classification_buffer = None
+        self.buffer_index = 0
+        self.total_buffer_size = buffer_size * 64
+
+    def fill_buffers(self):
+        boards = []
+        for _ in range(self.buffer_size):
+            try:
+                boards.append(next(self.dataset_iterator))
+            except StopIteration:
+                break
+
+        if not boards:
+            raise StopIteration
+
+        present_boards = [
+            board.pc_board.pieces_mask(self.piece_type, False) | board.pc_board.pieces_mask(self.piece_type, True)
+            for board in boards
+        ]
+
+        inputs = self.submodule.make_inputs(boards)
+        outputs = self.submodule(inputs)
+        self.data_buffer = outputs.to(self.device)
+        self.classification_buffer = np.array([
+            [present_squares & chess.BB_SQUARES[i] for i in range(64)]
+            for present_squares in present_boards
+        ]).reshape(-1, 1).astype(bool)
+        self.buffer_index = 0
 
     def __iter__(self):
-        for board in self.base_dataset.__iter__():
-            present_squares = board.pc_board.pieces_mask(self.piece_type, False) | board.pc_board.pieces_mask(self.piece_type, True)
-            inputs = self.submodule.make_inputs([board])
-            output = self.submodule(inputs)
-            for i in range(64):
-                yield output[i], int(bool(present_squares & chess.BB_SQUARES[i]))
+        while True:
+            if self.data_buffer is None or self.buffer_index >= self.total_buffer_size:
+                self.fill_buffers()
+
+            if self.buffer_index >= len(self.classification_buffer):
+                raise StopIteration
+
+            self.buffer_index += 1
+            yield self.data_buffer[self.buffer_index], self.classification_buffer[self.buffer_index]
 
 
 def train_probe(run_config, dataloader, criterion, device):
@@ -134,7 +171,7 @@ if __name__ == "__main__":
         device=device
     )
 
-    dataset = PieceClassificationDataset(base_dataset, submodule, chess.PAWN)
+    dataset = PieceClassificationDataset(base_dataset, submodule, chess.PAWN, device=device, buffer_size=128)
     dataloader = DataLoader(dataset=dataset, batch_size=run_config["batch_size"])
 
     train_probe(run_config, dataloader, criterion, device)
