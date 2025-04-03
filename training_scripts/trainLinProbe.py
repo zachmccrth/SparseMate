@@ -68,7 +68,7 @@ class PieceClassificationDataset(IterableDataset):
         self.classification_buffer = np.array([
             [present_squares & chess.BB_SQUARES[i] for i in range(64)]
             for present_squares in present_boards
-        ]).reshape(-1, 1).astype(bool)
+        ]).reshape(-1).astype(bool)
         self.buffer_index = 0
 
     def __iter__(self):
