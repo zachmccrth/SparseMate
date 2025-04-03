@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, IterableDataset
 from torch.utils.tensorboard import SummaryWriter
+from torch.optim.lr_scheduler import LambdaLR
 from tqdm import tqdm
 
 from datasets.datasets_data.chessbench.bag_data import ChessBenchDataset
@@ -49,7 +50,22 @@ def train_probe(run_config, dataloader, criterion, device):
     optimizer = torch.optim.Adam(model.parameters(), run_config["lr"])
     writer = SummaryWriter(log_dir=run_config["log_dir"])
 
-    total_samples = run_config["steps"] * run_config["batch_size"]
+    total_steps = run_config["steps"]
+    decay_start_fraction = run_config.get("lr_decay_start", 0.9)
+
+    def linear_tail_decay_fn(step):
+        decay_start = int(decay_start_fraction * total_steps)
+        if step < decay_start:
+            return 1.0
+        elif step >= total_steps:
+            return 0.0
+        else:
+            decay_progress = (step - decay_start) / (total_steps - decay_start)
+            return 1.0 - decay_progress
+
+    scheduler = LambdaLR(optimizer, lr_lambda=linear_tail_decay_fn)
+
+    total_samples = total_steps * run_config["batch_size"]
     progress_bar = tqdm(total=total_samples, desc="Training", unit="samples")
 
     step = 0
@@ -61,12 +77,15 @@ def train_probe(run_config, dataloader, criterion, device):
         loss = criterion(logits.view(-1), batch_y.float())
         loss.backward()
         optimizer.step()
+        scheduler.step()
 
         writer.add_scalar("Loss/train", loss.item(), step)
-        step += 1
-        progress_bar.update(len(batch_x))  # Count by number of samples
+        writer.add_scalar("LR", scheduler.get_last_lr()[0], step)
 
-        if step >= run_config["steps"]:
+        step += 1
+        progress_bar.update(len(batch_x))
+
+        if step >= total_steps:
             break
 
     progress_bar.close()
@@ -100,10 +119,11 @@ if __name__ == "__main__":
         "model_class": model_class,
         "lm_name": "leela",
         "run_name": run_name,
-        "lr": 1e-3,
+        "lr": 1e-2,
         "run_dir": run_dir,
         "log_dir": log_dir,
         "batch_size": batch_size,
+        "lr_decay_start": 0.9  # Start decaying in last 10% of training
     }
 
     submodule = TruncatedModel(
