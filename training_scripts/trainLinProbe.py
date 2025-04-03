@@ -162,7 +162,7 @@ def run_default_training_on_piece(piece_type):
         "run_dir": run_dir,
         "log_dir": log_dir,
         "batch_size": batch_size,
-        "lr_decay_start": 0.9  # Start decaying in last 10% of training
+        "lr_decay_start": 0.6  # Start decaying in last 1-n% of training
     }
 
     submodule = TruncatedModel(
