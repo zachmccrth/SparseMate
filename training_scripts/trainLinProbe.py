@@ -140,9 +140,9 @@ def run_default_training_on_piece(piece_type):
     criterion = nn.BCEWithLogitsLoss()
 
     batch_size = 8192
-    boards_to_train_on = 100_000
+    boards_to_train_on = 60_000
     steps = (boards_to_train_on * 64) // batch_size
-    layer = 2
+    layer = 6
     RESIDUAL_STREAM_DIM = 768
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
