@@ -134,8 +134,7 @@ def train_probe(run_config, dataloader, criterion, device):
     writer.close()
     print(f"Model saved to {os.path.join(run_config['run_dir'], 'model.pt')}")
 
-
-if __name__ == "__main__":
+def run_default_training_on_piece(piece_type):
     base_dataset = ChessBenchDataset()
     model_class = LinearClassifierNoBias
     criterion = nn.BCEWithLogitsLoss()
@@ -147,7 +146,7 @@ if __name__ == "__main__":
     RESIDUAL_STREAM_DIM = 768
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    run_name = f"{datetime.now().strftime('%m%d_%H:%M')}_LinProbe"
+    run_name = f"{datetime.now().strftime('%m%d_%H:%M')}_{chess.PIECE_NAMES[piece_type]}_LinProbe"
     run_dir = os.path.join("SAE_Models", run_name)
     log_dir = os.path.join(run_dir, "run_logs")
 
@@ -172,7 +171,12 @@ if __name__ == "__main__":
         device=device
     )
 
-    dataset = PieceClassificationDataset(base_dataset, submodule, chess.PAWN, device=device, buffer_size=128)
+    dataset = PieceClassificationDataset(base_dataset, submodule, piece_type, device=device, buffer_size=128)
     dataloader = DataLoader(dataset=dataset, batch_size=run_config["batch_size"])
 
     train_probe(run_config, dataloader, criterion, device)
+
+
+if __name__ == "__main__":
+    piece_types = {"PAWN": 1, "KNIGHT": 2, "BISHOP": 3, "ROOK": 4, "QUEEN": 5, "KING": 6}
+    run_default_training_on_piece(piece_types[sys.argv[1]])
