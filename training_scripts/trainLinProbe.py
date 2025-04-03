@@ -79,9 +79,10 @@ class PieceClassificationDataset(IterableDataset):
             if self.buffer_index >= len(self.classification_buffer):
                 raise StopIteration
 
-            self.buffer_index += 1
-            yield self.data_buffer[self.buffer_index], self.classification_buffer[self.buffer_index]
 
+            embedding, classification = self.data_buffer[self.buffer_index], self.classification_buffer[self.buffer_index]
+            self.buffer_index += 1
+            yield embedding, classification
 
 def train_probe(run_config, dataloader, criterion, device):
     model_class = run_config["model_class"]
