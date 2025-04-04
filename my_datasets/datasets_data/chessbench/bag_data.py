@@ -9,7 +9,7 @@ from typing import Any, SupportsIndex
 import torch.utils.data
 import zstandard as zstd
 
-from datasets import DatasetsAPI
+from my_datasets import DatasetsAPI
 from leela_interp.core.leela_board import LeelaBoard
 
 from apache_beam import coders
@@ -114,7 +114,7 @@ class BagFileReader(Sequence[bytes]):
 
 @DatasetsAPI.register("ChessBenchDataset")
 class ChessBenchDataset(torch.utils.data.Dataset):
-    def __init__(self, file_path = "/home/zachary/PycharmProjects/SparseMate/datasets/datasets_data/chessbench/action_value-00000-of-02148_data.bag",):
+    def __init__(self, file_path = "/home/zachary/PycharmProjects/SparseMate/my_datasets/datasets_data/chessbench/action_value-00000-of-02148_data.bag",):
         self.device = None
         self.file_path = file_path
         self.bag_reader = BagFileReader(file_path)

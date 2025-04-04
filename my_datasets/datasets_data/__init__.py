@@ -1,0 +1,2 @@
+from my_datasets.datasets_data.lichess_puzzles.puzzles import PuzzleDataset
+from my_datasets.datasets_data.chessbench.bag_data import ChessBenchDataset

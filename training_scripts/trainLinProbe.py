@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm import tqdm
 
-from datasets.datasets_data import ChessBenchDataset
+from my_datasets.datasets_data import ChessBenchDataset
 from leela_interp.core.leela_board import LeelaBoard
 from model_tools.truncated_leela import TruncatedModel
 import numpy as np

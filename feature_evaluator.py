@@ -3,7 +3,7 @@ import sys
 import numpy as np
 
 from SAE_Models.autoencoders import AutoEncoderDirectory
-from datasets.datasets_data import ChessBenchDataset
+from my_datasets.datasets_data import ChessBenchDataset
 from model_tools.truncated_leela import TruncatedModel
 # This one is necessary, don't let the IDE lie to you
 # DON'T BE A SHEEP

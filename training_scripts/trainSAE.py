@@ -8,7 +8,7 @@ if project_dir not in sys.path:
     sys.path.insert(0, project_dir)  # Insert at the beginning to give it precedence
 
 from model_tools.truncated_leela import TruncatedModel
-from datasets.datasets_data import ChessBenchDataset
+from my_datasets.datasets_data import ChessBenchDataset
 from dictionary_learning.dictionary import *
 from dictionary_learning.buffer import LeelaImpActivationBuffer
 from dictionary_learning.training import trainSAE

@@ -7,8 +7,9 @@ from leela_interp.core.leela_board import LeelaBoard
 
 class TruncatedModel(nn.Module):
     """
-    Creates the submodule to peek into the residual stream. Currently hardcoded to layer 6 until I decide to be better than that
+    Creates the submodule to peek into the residual stream. This is faster than what NNsight can achieve
     """
+
     def __init__(self, onnx_model_path, layer, device=torch.device("cpu")):
         super(TruncatedModel, self).__init__()
 
@@ -58,7 +59,7 @@ class SingleLayer(nn.Module):
         # Create a new input node (this will replace the input to encoder{layer})
         input_node = new_graph.placeholder("new_input")
         def get_or_copy(n):
-            """Copy nodes, but replace inputs to layer 6 with new inputs."""
+            """Copy nodes, but replace inputs to layer n with new inputs."""
             if n not in env:
                 if n.op == "placeholder":
                     # Replace the original input with our new input
@@ -67,7 +68,7 @@ class SingleLayer(nn.Module):
                     env[n] = new_graph.node_copy(n, lambda x: get_or_copy(x))
             return env[n]
 
-        # Copy only nodes belonging to layer 6 and beyond
+        # Copy only nodes belonging to layer n and beyond
         for node in lc0.graph.nodes:
             if isinstance(node.target, str) and node.target.startswith(f"encoder{layer}"):
                 env[node] = new_graph.node_copy(node, get_or_copy)

@@ -5,7 +5,7 @@ import numpy as np
 import torch.utils.data
 import csv
 
-from datasets import DatasetsAPI
+from my_datasets import DatasetsAPI
 
 from leela_interp.core.leela_board import LeelaBoard
 
