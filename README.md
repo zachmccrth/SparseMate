@@ -4,9 +4,9 @@ A work in progress research project in applying modern mechanistic interpretabil
 
 Techniques include using Sparse Autoencoders to develop decompositions of features in the residual stream, and linear probing to validate findings. Future work may include integrating SAEs and linear probes in the hope of enforcing human-interpretable features, expanding linear probing to produce general linear subspaces, and analyzing the effects of relative chess piece placement on embeddings.
 
-Repository includes modified code from Jenner et al. [@jenner2024evidence] and by Marks et al. [@marks2024dictionary_learning].
+Repository includes modified code from Jenner et al. and by Marks et al..
 
-Additional models and data from Jenner et al. [@jenner2024evidence] and from Ruoss et al. [@ruoss2024amortized].
+Additional models and data from Jenner et al. and from Ruoss et al..
 
 Note: Project has grown organically over time. Enter this repository at your own risk!
 
