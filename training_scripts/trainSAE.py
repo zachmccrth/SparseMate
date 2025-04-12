@@ -1,5 +1,6 @@
 from datetime import datetime
 import sys
+from dictionary_learning.trainers.gogs import GOGSTrainer
 
 from dictionary_learning.trainers.jumprelu import JumpReluCoordinateTrainer
 
@@ -21,8 +22,8 @@ if __name__ == '__main__':
     
     dataset_class = ChessBenchDataset
     # Train the SAE
-    trainer_class = JumpReluCoordinateTrainer
-    autoencoder_class = JumpReluAutoEncoder
+    trainer_class = GOGSTrainer
+    autoencoder_class = GOGS
 
     tokens_per_step = 2**12
     boards_to_train_on = 500_000
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     layer = 2
 
     RESIDUAL_STREAM_DIM = 768
-    autoencoder_dim = 2**4 * RESIDUAL_STREAM_DIM
+    autoencoder_dim = 2**2 * RESIDUAL_STREAM_DIM
     
 
     print(f"Training on {boards_to_train_on * 64:,} tokens ({boards_to_train_on:,} boards) in {steps:,} training steps")
@@ -57,7 +58,7 @@ if __name__ == '__main__':
         d_submodule=RESIDUAL_STREAM_DIM,
         device=device,
         out_batch_size= tokens_per_step,
-        dtype = torch.float16,
+        dtype = torch.float32,
         layer=layer,
     )
 
@@ -75,13 +76,8 @@ if __name__ == '__main__':
         "lm_name": "leela",
         "run_name": run_name,
         "device": str(device),
-        "target_l0": 20,
-        "sparsity_warmup_steps": sparsity_warmup_steps,
-        "warmup_steps": sparsity_warmup_steps,
-        "sparsity_penalty" : 0.02,
-        "submodule_name": TruncatedModel.__name__,
-        "lr": 5e-4,
-        "log_dir": os.path.join("SAE_Models",os.path.join(run_name, "run_logs"))
+        "lr": 1e-5,
+        "dtype": torch.float32,
     }
 
     # train the sparse autoencoder (SAE)
@@ -93,6 +89,7 @@ if __name__ == '__main__':
         device=str(device),
         use_tensorboard=True,
         log_steps=20,
-        autocast_dtype=torch.float16,
-        save_steps=[i for i in range(save_interval, steps, save_interval)]
+        autocast_dtype=torch.float32,
+        save_steps=[i for i in range(save_interval, steps, save_interval)],
+        run_cfg={"log_dir": os.path.join("SAE_Models",os.path.join(run_name, "run_logs"))}
     )
