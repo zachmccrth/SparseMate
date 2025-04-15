@@ -53,6 +53,13 @@
 
     <button onclick="generateHeatmap()">Generate Heatmap</button>
 
+    <button onclick="findSimilarFeatures()">Find Similar Features</button>
+    <div id="similar-features" style="margin-top: 20px;">
+        <h3>Similar Features</h3>
+        <ul id="similar-features-list"></ul>
+    </div>
+
+
     <div id="heatmaps"></div>
 
     <script>
@@ -104,6 +111,43 @@
         }
 
         document.addEventListener('DOMContentLoaded', updateFeatures);
-    </script>
+        async function findSimilarFeatures() {
+            const tableName = document.getElementById('tables').value;
+            const featureId = document.getElementById('features').value;
+
+            const response = await fetch('/similar_features', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ table_name: tableName, feature_id: featureId })
+            });
+
+            const data = await response.json();
+            const list = document.getElementById('similar-features-list');
+            list.innerHTML = '';
+
+            data.similar_features.forEach(item => {
+                const li = document.createElement('li');
+                li.innerHTML = `Feature <strong>${item.feature}</strong> (Score: ${item.score.toFixed(2)})`;
+                li.style.cursor = 'pointer';
+                li.onclick = async () => {
+                    // Set the selected similar feature as the new selection
+                    const featureSelect = document.getElementById('features');
+                    let option = Array.from(featureSelect.options).find(o => o.value === item.feature);
+                    if (!option) {
+                        option = document.createElement('option');
+                        option.value = item.feature;
+                        option.textContent = item.feature;
+                        featureSelect.appendChild(option);
+                    }
+                    featureSelect.value = item.feature;
+
+                    await generateHeatmap();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+                list.appendChild(li);
+            });
+    }
+</script>
+
 </body>
 </html>
