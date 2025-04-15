@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, jsonify
 import sqlite3
 import numpy as np
 import chess
+import re
 
 from dictionary_learning.dictionary import GOGS
 from leela_interp.core.iceberg_board import IcebergBoard
