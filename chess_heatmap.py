@@ -13,6 +13,7 @@ import os
 app = Flask(__name__)
 # Global dictionary to cache models
 model_cache = {}
+projections_cache = {}
 
 def table_name_to_filepath(table_name):
     """
@@ -190,6 +191,26 @@ def heatmap():
 
     return jsonify({'heatmaps': heatmap_images})
 
+
+def projection_cache_access(table_name, feature_id):
+    """
+    Return projections for a given table and feature ID from the cache.
+    Uses lazy loading to avoid loading the model for each request.
+    """
+    if not table_name in projections_cache:
+        model = load_model(table_name)
+        if not model:
+            print (f"Model not found for table {table_name}")
+            return None
+        projections = torch.matmul(model.basis_set, model.basis_set.T)
+        projections_cache[table_name] = projections.cpu().detach().numpy()
+    try:
+        return projections_cache[table_name][feature_id]
+    except KeyError:
+        print(f"Feature {feature_id} not found in projection cache for table {table_name}")
+        return None
+
+
 @app.route('/similar_features', methods=['POST'])
 def similar_features():
     data = request.json
@@ -201,18 +222,15 @@ def similar_features():
     if model is None:
         return jsonify({'error': 'Model not available'}), 404
 
-    # Use the model for your similarity calculations
-    # ...
+    projections = projection_cache_access(table_name, feature_id)
 
-    projections = torch.matmul(model.basis_set, model.basis_set.T)
+    # Get top 5 values and their indices
+    top_indices = np.argsort(projections)[-5:][::-1]  # Last 5 sorted descending
+    top_values = projections[top_indices]
 
-
-
-    # Example (replace with your actual implementation):
+    # Format similar features list
     similar = [
-        {'feature': 'f123', 'score': 0.92},
-        {'feature': 'f234', 'score': 0.89},
-        {'feature': 'f345', 'score': 0.85}
+        {'feature': f'f{int(idx)}', 'score': float(val)} for idx, val in zip(top_indices, top_values)
     ]
 
     return jsonify({'similar_features': similar})
