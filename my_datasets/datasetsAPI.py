@@ -2,6 +2,9 @@ from typing import List
 from torch.utils.data import Dataset
 
 class DatasetsAPI:
+    """
+    A registry class for accessing imported datasets
+    """
     _registry = {}
 
     @classmethod
