@@ -1,3 +1,5 @@
+import json
+import os
 from typing import List
 import sys
 import numpy as np
@@ -8,7 +10,7 @@ from model_tools.truncated_leela import TruncatedModel
 # This one is necessary, don't let the IDE lie to you
 # DON'T BE A SHEEP
 from dictionary_learning.dictionary import *
-
+from my_datasets.datasets_data.lichess_puzzles.puzzles import PuzzleDataset
 
 # Add the main project directory to sys.path
 project_dir = "/"
@@ -22,7 +24,7 @@ import sqlite3
 import torch
 
 class BoardActivationBuffer:
-    def __init__(self, data, submodule, d_submodule, device, size=20,):
+    def __init__(self, data, submodule, d_submodule, device, size=20):
         self.data = data
         self.submodule = submodule
         self.d_submodule = d_submodule
@@ -205,17 +207,25 @@ if __name__ == "__main__":
 
     num_of_boards = 1000
 
-    chessbench = ChessBenchDataset()
+    # chessbench = ChessBenchDataset()
+    dataset = PuzzleDataset("/home/zachary/PycharmProjects/SparseMate/my_datasets/datasets_data/lichess_puzzles/lichess_db_puzzle.csv")
 
     autoencoder_directory = AutoEncoderDirectory()
-
-
-
     last_model_run_config = autoencoder_directory.get_last_created_model()
+
+    # item_path = "/home/zachary/PycharmProjects/SparseMate/SAE_Models/0412_16:24_GOGSTrainer"
+    # config_path = os.path.join(item_path, "config.json")
+    # with open(config_path) as json_file:
+    #     config = json.load(json_file)
+    #     config["timestamp"] = os.path.getctime(config_path)
+    #     config["model_path"] = os.path.join(item_path, "ae.pt")
+    # last_model_run_config = config
+
+    last_model_run_config["trainer"]["submodule_name"] = "TruncatedModel"
     print(last_model_run_config)
     table_name = f"RUN_{last_model_run_config['trainer']["run_name"].replace('_', '').replace(':', '')}"
     print(f"Writing the activations of {last_model_run_config['trainer']['run_name']} to {table_name} ")
 
 
-    write_to_db(dataset=chessbench, table_name= table_name, autoencoder_config=last_model_run_config, total_boards_max=num_of_boards, threshold=0.001, device=device)
+    write_to_db(dataset=dataset, table_name= table_name, autoencoder_config=last_model_run_config, total_boards_max=num_of_boards, threshold=0.01, device=device)
 

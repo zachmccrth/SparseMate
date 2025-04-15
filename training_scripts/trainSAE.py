@@ -26,7 +26,7 @@ if __name__ == '__main__':
     autoencoder_class = GOGS
 
     tokens_per_step = 2**12
-    boards_to_train_on = 500_000
+    boards_to_train_on = 400_000
     sparsity_warmup_boards = boards_to_train_on - 1_000
 
     steps = (boards_to_train_on * 64)  // tokens_per_step
@@ -76,8 +76,9 @@ if __name__ == '__main__':
         "lm_name": "leela",
         "run_name": run_name,
         "device": str(device),
-        "lr": 1e-5,
+        "lr": 5e-4,
         "dtype": torch.float32,
+        "layers": 6
     }
 
     # train the sparse autoencoder (SAE)
