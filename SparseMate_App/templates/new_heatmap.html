@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Chess Heatmap</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            text-align: center;
+        }
+        .container {
+            width: 80%;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        input, select {
+            padding: 10px;
+            width: 60%;
+            max-width: 400px;
+            margin: 10px 0;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            color: #333;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #heatmap-result {
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .heatmap-item img {
+            max-width: 100%;
+            border-radius: 10px;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Generate a Chess Heatmap</h1>
+
+        <form id="heatmap-form">
+            <div class="input-group">
+                <label for="fen-input">Enter FEN String:</label>
+                <input type="text" id="fen-input" placeholder="Enter chess FEN string here..." required>
+            </div>
+
+            <div class="input-group">
+                <label for="model-select">Select Model:</label>
+                <select id="model-select" required>
+                    <option value="">-- Select a Model --</option>
+                    <option value="model1">Trained Model 1</option>
+                    <option value="model2">Trained Model 2</option>
+                    <option value="model3">Trained Model 3</option>
+                </select>
+            </div>
+
+            <button type="submit">Generate Heatmap</button>
+            <div class="error" id="error-message"></div>
+        </form>
+
+        <div id="heatmap-result"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('heatmap-form');
+        const heatmapResult = document.getElementById('heatmap-result');
+        const errorMessage = document.getElementById('error-message');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const fen = document.getElementById('fen-input').value;
+            const model = document.getElementById('model-select').value;
+
+            // Validate input
+            if (!fen || !model) {
+                errorMessage.textContent = "Please fill in all fields.";
+                return;
+            } else {
+                errorMessage.textContent = "";
+            }
+
+            // Generate heatmap
+            try {
+                const response = await fetch('/generate_heatmap', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fen, model })
+                });
+
+                const data = await response.json();
+
+                // Clear the previous heatmap
+                heatmapResult.innerHTML = "";
+
+                // Check for errors in response
+                if (data.error) {
+                    errorMessage.textContent = data.error;
+                    return;
+                }
+
+                // Display Heatmap
+                data.heatmaps.forEach(item => {
+                    const heatmapItem = document.createElement('div');
+                    heatmapItem.classList.add('heatmap-item');
+
+                    const img = document.createElement('img');
+                    img.src = 'data:image/png;base64,' + item.image;
+
+                    heatmapItem.appendChild(img);
+                    heatmapResult.appendChild(heatmapItem);
+                });
+            } catch (error) {
+                errorMessage.textContent = "Something went wrong. Please try again later.";
+            }
+        });
+    </script>
+</body>
+</html>
