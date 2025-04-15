@@ -566,29 +566,21 @@ class JumpReLU(Dictionary, nn.Module):
 
 class GOGS(Dictionary, nn.Module):
 
-    def __init__(self, basis_size: int, embedding_dimensions: int, device, dtype = torch.float16, *args, **kwargs):
+    def __init__(self, basis_size: int, embedding_dimensions: int, device, dtype = torch.float32, layers = 6, *args, **kwargs):
         super().__init__(*args, **kwargs)
         B = torch.randn(basis_size, embedding_dimensions, device = device, dtype = dtype)
         B = B / B.norm(dim=1, keepdim=True)
         self.basis_set = torch.nn.Parameter(data=B, requires_grad=True)
 
         print(f"GOGS initialized on {device}, with dtype={dtype}")
+        self.layers = layers
+        self.single_layer = DimensionReduction(self.basis_set)
 
-        self.first_layer = DimensionReduction(self.basis_set)
-        self.second_layer = DimensionReduction(self.basis_set)
-        self.third_layer = DimensionReduction(self.basis_set)
-        self.fourth_layer = DimensionReduction(self.basis_set)
-        self.fifth_layer = DimensionReduction(self.basis_set)
-        self.sixth_layer = DimensionReduction(self.basis_set)
 
     def forward(self, embeddings: torch.Tensor):
-        first_output = self.first_layer(embeddings)
-        second_output = self.second_layer(first_output)
-        third_output = self.third_layer(second_output)
-        fourth_output = self.fourth_layer(third_output)
-        fifth_output = self.fifth_layer(fourth_output)
-        sixth_output = self.sixth_layer(fifth_output)
-        return sixth_output
+        for i in range (self.layers):
+            embeddings = self.single_layer(embeddings)
+        return embeddings
 
     def encode(self, x):
         return torch.matmul(x, self.basis_set.T)

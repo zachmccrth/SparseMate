@@ -1,3 +1,5 @@
+import json
+import os
 from typing import List
 import sys
 import numpy as np
@@ -8,7 +10,7 @@ from model_tools.truncated_leela import TruncatedModel
 # This one is necessary, don't let the IDE lie to you
 # DON'T BE A SHEEP
 from dictionary_learning.dictionary import *
-
+from my_datasets.datasets_data.lichess_puzzles.puzzles import PuzzleDataset
 
 # Add the main project directory to sys.path
 project_dir = "/"
@@ -22,7 +24,7 @@ import sqlite3
 import torch
 
 class BoardActivationBuffer:
-    def __init__(self, data, submodule, d_submodule, device, size=20,):
+    def __init__(self, data, submodule, d_submodule, device, size=20):
         self.data = data
         self.submodule = submodule
         self.d_submodule = d_submodule
@@ -205,7 +207,8 @@ if __name__ == "__main__":
 
     num_of_boards = 1000
 
-    chessbench = ChessBenchDataset()
+    # chessbench = ChessBenchDataset()
+    dataset = PuzzleDataset("/home/zachary/PycharmProjects/SparseMate/my_datasets/datasets_data/lichess_puzzles/lichess_db_puzzle.csv")
 
     autoencoder_directory = AutoEncoderDirectory()
 
@@ -218,5 +221,5 @@ if __name__ == "__main__":
     #Was not included in some models
     model_config['trainer']['submodule_name'] = "TruncatedModel"
 
-    write_to_db(dataset=chessbench, table_name= table_name, autoencoder_config=model_config, total_boards_max=num_of_boards, threshold=0.1, device=device)
+    write_to_db(dataset=dataset, table_name= table_name, autoencoder_config=model_config, total_boards_max=num_of_boards, threshold=0.1, device=device)
 

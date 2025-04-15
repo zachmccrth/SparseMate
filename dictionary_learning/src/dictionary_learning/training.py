@@ -39,7 +39,7 @@ def log_metrics(trainer, step: int, embedding: t.Tensor, log_queue: mp.Queue):
         # Fraction of variance explained
         residual = trainer.ae(embedding)
         total_variance = t.var(embedding, dim=0).sum()
-        residual_variance = t.var(embedding - residual, dim=0).sum()
+        residual_variance = t.var(residual, dim=0).sum()
         frac_variance_explained = 1 - residual_variance / total_variance
         log["frac_variance_explained"] = frac_variance_explained.item()
 

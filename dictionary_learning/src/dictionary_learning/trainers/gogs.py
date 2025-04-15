@@ -18,6 +18,7 @@ class GOGSTrainer(nn.Module, SAETrainer):
         device: str = "cpu",
         run_name: str = "GOGS",
         dtype: torch.dtype = torch.float16,
+        layers: int = 6,
         *args,
         **kwargs,
     ):
@@ -32,7 +33,7 @@ class GOGSTrainer(nn.Module, SAETrainer):
         self.lr = lr
         self.device = device
         self.run_name = run_name
-        self.ae = GOGS(basis_size=dict_size, embedding_dimensions=activation_dim, device=device, dtype=dtype)
+        self.ae = GOGS(basis_size=dict_size, embedding_dimensions=activation_dim, device=device, dtype=dtype, layers=layers)
         # self.loss = torch.nn.MSELoss()
         self.logging_parameters = []
         self.optimizer = torch.optim.Adam(self.ae.parameters(), lr=lr)
