@@ -209,13 +209,14 @@ if __name__ == "__main__":
 
     autoencoder_directory = AutoEncoderDirectory()
 
+    # model_config = autoencoder_directory.get_last_created_model()
+    model_config = autoencoder_directory.get_model("0413_16:45_GOGSTrainer")
+    print(model_config)
+    table_name = f"RUN_{model_config['trainer']["run_name"].replace('_', '').replace(':', '')}"
+    print(f"Writing the activations of {model_config['trainer']['run_name']} to {table_name} ")
 
+    #Was not included in some models
+    model_config['trainer']['submodule_name'] = "TruncatedModel"
 
-    last_model_run_config = autoencoder_directory.get_last_created_model()
-    print(last_model_run_config)
-    table_name = f"RUN_{last_model_run_config['trainer']["run_name"].replace('_', '').replace(':', '')}"
-    print(f"Writing the activations of {last_model_run_config['trainer']['run_name']} to {table_name} ")
-
-
-    write_to_db(dataset=chessbench, table_name= table_name, autoencoder_config=last_model_run_config, total_boards_max=num_of_boards, threshold=0.001, device=device)
+    write_to_db(dataset=chessbench, table_name= table_name, autoencoder_config=model_config, total_boards_max=num_of_boards, threshold=0.1, device=device)
 

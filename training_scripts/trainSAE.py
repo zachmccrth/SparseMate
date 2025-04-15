@@ -78,6 +78,7 @@ if __name__ == '__main__':
         "device": str(device),
         "lr": 1e-5,
         "dtype": torch.float32,
+        "submodule_name": "TruncatedModel",
     }
 
     # train the sparse autoencoder (SAE)
@@ -91,5 +92,5 @@ if __name__ == '__main__':
         log_steps=20,
         autocast_dtype=torch.float32,
         save_steps=[i for i in range(save_interval, steps, save_interval)],
-        run_cfg={"log_dir": os.path.join("SAE_Models",os.path.join(run_name, "run_logs"))}
+        run_cfg={"log_dir":"/home/zachary/PycharmProjects/SparseMate/SAE_Models" }
     )
