@@ -78,7 +78,7 @@ if __name__ == '__main__':
         "device": str(device),
         "lr": 5e-4,
         "dtype": torch.float32,
-        "layers": 6
+        "layers": 6,
         "submodule_name": "TruncatedModel",
     }
 
