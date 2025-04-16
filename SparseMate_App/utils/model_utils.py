@@ -76,3 +76,39 @@ def get_similar_features(table_name, feature_id):
         return [{'feature': f'{int(idx)}', 'score': float(val)} for idx, val in zip(top_indices, top_values)]
     except KeyError:
         return None
+
+
+def fetch_graph_data(table_name, feature_id, threshold=0.5, max_neighbors=10):
+    """
+    Fetch graph data for the given table and feature_id.
+
+    Arguments:
+    table_name -- The name of the table (used for the projection matrix).
+    feature_id -- The ID of the selected feature.
+    threshold -- Minimum similarity score for linking nodes.
+    max_neighbors -- Maximum number of neighbors to fetch.
+
+    Returns:
+    A dictionary with `nodes` and `edges`.
+    """
+
+    projections = projections_cache_access(table_name)
+
+    if feature_id < 0 or feature_id >= projections.shape[0]:
+        return None
+
+    # Node List: Include the main feature and the nearest neighbors
+    nodes = [{'id': int(feature_id), 'label': f'f{feature_id}'}]
+    edges = []
+
+    # Find top neighbors above threshold similarity
+    similarity_scores = projections[feature_id]
+    neighbor_indices = np.argsort(similarity_scores)[::-1][1:max_neighbors + 1]  # Skip self (top index)
+
+    for neighbor in neighbor_indices:
+        score = similarity_scores[neighbor]
+        if score >= threshold:
+            nodes.append({'id': int(neighbor), 'label': f'f{neighbor}'})
+            edges.append({'from': int(feature_id), 'to': int(neighbor), 'label': f"{score:.2f}"})
+
+    return {'nodes': nodes, 'edges': edges}
