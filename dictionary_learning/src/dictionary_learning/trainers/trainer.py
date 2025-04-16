@@ -9,6 +9,7 @@ class SAETrainer:
     """
 
     def __init__(self, seed=None):
+        super().__init__()
         self.seed = seed
         self.logging_parameters = []
 

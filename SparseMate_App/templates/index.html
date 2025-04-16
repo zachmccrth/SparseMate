@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to SparseMate</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        header {
+            text-align: center;
+            padding: 20px;
+            background-color: #007bff;
+            color: white;
+            border-bottom: 3px solid #0056b3;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        main {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 80vh;
+            text-align: center;
+        }
+        .content {
+            max-width: 600px;
+        }
+        .content h2 {
+            font-size: 2em;
+            color: #333;
+        }
+        a.button {
+            display: inline-block;
+            padding: 15px 30px;
+            margin-top: 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            font-size: 1.2em;
+            border-radius: 5px;
+            transition: background-color 0.3s ease-in-out;
+        }
+        a.button:hover {
+            background-color: #0056b3;
+        }
+        footer {
+            text-align: center;
+            padding: 10px;
+            background-color: #f4f4f9;
+            color: #666;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Welcome to SparseMate</h1>
+    </header>
+    <main>
+        <div class="content">
+            <h2>Your Ultimate Chess Heatmap Generator</h2>
+            <p>Analyze your chess games like never before with feature-rich heatmaps and similarity comparisons.</p>
+            <a class="button" href="{{ url_for('heatmap_bp.heatmap') }}">Go to Heatmap Generator</a>
+        </div>
+    </main>
+    <footer>
+        <p>© 2025 SparseMate. All rights reserved.</p>
+    </footer>
+</body>
+</html>

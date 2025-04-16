@@ -564,3 +564,52 @@ class JumpReLU(Dictionary, nn.Module):
             autoencoder.to(device)
         return autoencoder
 
+class GOGS(Dictionary, nn.Module):
+
+    def __init__(self, basis_size: int, embedding_dimensions: int, device, dtype = torch.float32, layers = 6, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        B = torch.randn(basis_size, embedding_dimensions, device = device, dtype = dtype)
+        B = B / B.norm(dim=1, keepdim=True)
+        self.basis_set = torch.nn.Parameter(data=B, requires_grad=True)
+
+        print(f"GOGS initialized on {device}, with dtype={dtype}")
+        self.layers = layers
+        self.single_layer = DimensionReduction(self.basis_set)
+
+
+    def forward(self, embeddings: torch.Tensor):
+        for i in range (self.layers):
+            embeddings = self.single_layer(embeddings)
+        return embeddings
+
+    def encode(self, x):
+        return torch.matmul(x, self.basis_set.T)
+
+    def decode(self, f):
+        return torch.matmul(f, self.basis_set.T)
+
+    @classmethod
+    def from_pretrained(cls, path, device=None) -> Dictionary:
+        state_dict = t.load(path, weights_only=True)
+        basis_size, embedding_dimensions = state_dict["basis_set"].shape
+        autoencoder = cls(basis_size, embedding_dimensions, device)
+        autoencoder.load_state_dict(state_dict)
+        return autoencoder
+
+
+class DimensionReduction(torch.nn.Module):
+    def __init__(self, basis):
+        super().__init__()
+        self.basis = basis
+
+
+    def forward(self, residuals: torch.Tensor, return_weights=False):
+        dot_products = torch.matmul(residuals, self.basis.T) # (Batch, D) x (D, M) → (Batch, M)
+        scales, best_vector_idx = torch.max(dot_products, dim=1) # (B value is mth)
+        projections = scales[:, None] * self.basis[best_vector_idx, :]
+        return residuals - projections
+
+
+
+
+

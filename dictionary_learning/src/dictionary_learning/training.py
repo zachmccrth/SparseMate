@@ -29,36 +29,25 @@ def new_training_logging_process(run_name, config, metric_queue):
     writer.close()
 
 
-def log_metrics(
-    trainer,
-    step: int,
-    residual: t.Tensor,
-    log_queue: mp.Queue,
-):
+def log_metrics(trainer, step: int, embedding: t.Tensor, log_queue: mp.Queue):
     with t.no_grad():
-        # quick hack to make sure all trainers get the same x
-        z = residual.clone()
-        residual = z.clone()
-        residual, residual_reconstruction, feature_encoding, loss_log = trainer.loss(residual, step=step, logging=True)
-
         log = {"step": step}
-        # L0
-        l0 = (feature_encoding != 0).float().sum(dim=-1).mean().item()
-        log[f"l0"] = l0
 
-        # fraction of variance explained
-        total_variance = t.var(residual, dim=0).sum()
-        residual_variance = t.var(residual - residual_reconstruction, dim=0).sum()
+        if hasattr(trainer, "last_log"):
+            log.update(trainer.last_log)
+
+        # Fraction of variance explained
+        residual = trainer.ae(embedding)
+        total_variance = t.var(embedding, dim=0).sum()
+        residual_variance = t.var(residual, dim=0).sum()
         frac_variance_explained = 1 - residual_variance / total_variance
-        log[f"frac_variance_explained"] = frac_variance_explained.item()
+        log["frac_variance_explained"] = frac_variance_explained.item()
 
-        # Log Gradient Norm
-        if hasattr(trainer, 'last_grad_norm') and trainer.last_grad_norm:
+        # Log gradient norm if available
+        if hasattr(trainer, "last_grad_norm") and trainer.last_grad_norm:
             log["grad_norm"] = trainer.last_grad_norm
 
-        # log losses from training
-        log.update({f"{k}": v.cpu().item() if isinstance(v, t.Tensor) else v for k, v in loss_log.items()})
-
+        # Add custom trainer-level metrics if any
         trainer_log = trainer.get_logging_parameters()
         for name, value in trainer_log.items():
             if isinstance(value, t.Tensor):
@@ -67,6 +56,7 @@ def log_metrics(
 
         if log_queue:
             log_queue.put(log)
+
 
 def get_norm_factor(data, steps: int) -> float:
     """Per Section 3.1, find a fixed scalar factor so activation vectors have unit mean squared norm.
