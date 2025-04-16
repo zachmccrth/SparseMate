@@ -57,4 +57,12 @@ class AutoEncoderDirectory:
         # Return the config dictionary of the last created model
         return last_model[1]
 
-    # TODO, it might be nice to encapsulate much of the init logic here
+    def get_model(self, name: str):
+        if not self.models:
+            print("No models found")
+            return None
+
+        model_config = self.models[name]
+
+        return model_config
+

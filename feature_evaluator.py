@@ -8,7 +8,7 @@ from model_tools.truncated_leela import TruncatedModel
 # This one is necessary, don't let the IDE lie to you
 # DON'T BE A SHEEP
 from dictionary_learning.dictionary import *
-
+from my_datasets.datasets_data.lichess_puzzles.puzzles import PuzzleDataset
 
 # Add the main project directory to sys.path
 project_dir = "/"
@@ -22,7 +22,7 @@ import sqlite3
 import torch
 
 class BoardActivationBuffer:
-    def __init__(self, data, submodule, d_submodule, device, size=20,):
+    def __init__(self, data, submodule, d_submodule, device, size=20):
         self.data = data
         self.submodule = submodule
         self.d_submodule = d_submodule
@@ -205,17 +205,19 @@ if __name__ == "__main__":
 
     num_of_boards = 1000
 
-    chessbench = ChessBenchDataset()
+    # chessbench = ChessBenchDataset()
+    dataset = PuzzleDataset("/home/zachary/PycharmProjects/SparseMate/my_datasets/datasets_data/lichess_puzzles/lichess_db_puzzle.csv")
 
     autoencoder_directory = AutoEncoderDirectory()
 
+    # model_config = autoencoder_directory.get_last_created_model()
+    model_config = autoencoder_directory.get_model("0413_16:45_GOGSTrainer")
+    print(model_config)
+    table_name = f"RUN_{model_config['trainer']["run_name"].replace('_', '').replace(':', '')}"
+    print(f"Writing the activations of {model_config['trainer']['run_name']} to {table_name} ")
 
+    #Was not included in some models
+    model_config['trainer']['submodule_name'] = "TruncatedModel"
 
-    last_model_run_config = autoencoder_directory.get_last_created_model()
-    print(last_model_run_config)
-    table_name = f"RUN_{last_model_run_config['trainer']["run_name"].replace('_', '').replace(':', '')}"
-    print(f"Writing the activations of {last_model_run_config['trainer']['run_name']} to {table_name} ")
-
-
-    write_to_db(dataset=chessbench, table_name= table_name, autoencoder_config=last_model_run_config, total_boards_max=num_of_boards, threshold=0.001, device=device)
+    write_to_db(dataset=dataset, table_name= table_name, autoencoder_config=model_config, total_boards_max=num_of_boards, threshold=0.1, device=device)
 
