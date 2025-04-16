@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Feature Heatmaps</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            text-align: center;
+        }
+        #heatmaps {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .heatmap-item {
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .heatmap-item img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }
+        .fen {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 12px;
+            max-width: 100%;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chess Feature Heatmaps</h1>
+
+    <label for="tables">Select Table:</label>
+    <select id="tables" onchange="updateFeatures()">
+        {% for table in tables %}
+            <option value="{{ table }}">{{ table }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="features">Select Feature:</label>
+    <select id="features"></select>
+
+    <button onclick="generateHeatmap()">Generate Heatmap</button>
+
+    <button onclick="findSimilarFeatures()">Find Similar Features</button>
+    <div id="similar-features" style="margin-top: 20px;">
+        <h3>Similar Features</h3>
+        <ul id="similar-features-list"></ul>
+    </div>
+
+    <div id="loading" style="display: none; text-align: center; margin-top: 20px;">
+    <p>Loading heatmaps...</p>
+    <img src="/static/spinner.gif" alt="Loading..." style="width: 50px; height: 50px;">
+    </div>
+
+
+
+    <div id="heatmaps"></div>
+
+    <script>
+
+    async function updateFeatures() {
+        const tableName = document.getElementById('tables').value;
+        const response = await fetch('/features', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table_name: tableName })
+        });
+        const data = await response.json();
+        const featuresSelect = document.getElementById('features');
+        featuresSelect.innerHTML = "";
+        data.features.forEach(feature => {
+            const option = document.createElement('option');
+            option.value = feature;
+            option.textContent = feature;
+            featuresSelect.appendChild(option);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', updateFeatures);
+
+
+        async function generateHeatmap() {
+        const tableName = document.getElementById('tables').value;
+        const featureId = document.getElementById('features').value;
+        const heatmapsDiv = document.getElementById('heatmaps');
+        const loadingIndicator = document.getElementById('loading');
+
+        // Clear previous heatmaps and show the loading indicator
+        heatmapsDiv.innerHTML = '';
+        loadingIndicator.style.display = 'block';
+
+        try {
+            const response = await fetch('/heatmap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ table_name: tableName, feature_id: featureId })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch heatmaps');
+            }
+
+            const data = await response.json();
+
+            // Clear the heatmap container before rendering
+            heatmapsDiv.innerHTML = '';
+
+            // Render the fetched heatmaps
+            data.heatmaps.forEach(item => {
+                const heatmapItem = document.createElement('div');
+                heatmapItem.className = 'heatmap-item';
+
+                const fenDiv = document.createElement('div');
+                fenDiv.className = 'fen';
+                fenDiv.textContent = `${item.fen}`;
+
+                const imgElement = document.createElement('img');
+                imgElement.src = 'data:image/png;base64,' + item.image;
+
+                heatmapItem.appendChild(fenDiv);
+                heatmapItem.appendChild(imgElement);
+                heatmapsDiv.appendChild(heatmapItem);
+            });
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        } finally {
+            // Hide the loading indicator
+            loadingIndicator.style.display = 'none';
+        }
+    }
+
+
+        document.addEventListener('DOMContentLoaded', updateFeatures);
+        async function findSimilarFeatures() {
+            const tableName = document.getElementById('tables').value;
+            const featureId = document.getElementById('features').value;
+
+            const response = await fetch('/similar_features', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ table_name: tableName, feature_id: featureId })
+            });
+
+            const data = await response.json();
+            const list = document.getElementById('similar-features-list');
+            list.innerHTML = '';
+
+            data.similar_features.forEach(item => {
+                const li = document.createElement('li');
+                li.innerHTML = `Feature <strong>${item.feature}</strong> (Score: ${item.score.toFixed(2)})`;
+                li.style.cursor = 'pointer';
+                li.onclick = async () => {
+                    // Set the selected similar feature as the new selection
+                    const featureSelect = document.getElementById('features');
+                    let option = Array.from(featureSelect.options).find(o => o.value === item.feature);
+                    if (!option) {
+                        option = document.createElement('option');
+                        option.value = item.feature;
+                        option.textContent = item.feature;
+                        featureSelect.appendChild(option);
+                    }
+                    featureSelect.value = item.feature;
+
+                    await generateHeatmap();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+                list.appendChild(li);
+            });
+    }
+</script>
+
+</body>
+</html>

@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, render_template
 from ..services.heatmap_service import generate_heatmap_from_feature
 from ..utils.db_utils import get_features, get_tables
 
-heatmap_bp = Blueprint('heatmap', __name__)
+heatmap_bp = Blueprint('heatmap_bp', __name__)
 
 
 @heatmap_bp.route('/heatmap', methods=['POST', 'GET'])
@@ -14,7 +14,7 @@ def heatmap():
         return answer_heatmap_request()
     else:
 
-        return render_template("index.html", tables=get_tables())
+        return render_template("heatmap.html", tables=get_tables())
 
 @heatmap_bp.route('/features', methods=['POST'])
 def fetch_features():

@@ -36,10 +36,11 @@ def generate_heatmap_from_feature(table_name, feature_id):
 
     # Render the heatmaps as Base64 images
     heatmap_images = []
+    max_value = max(boards[fens_ordered[0]])
     for fen in fens_ordered[:50]:
         board = chess.Board(fen)
         heatmap_data = boards.get(fen, np.zeros(64))
-        iceberg_board = IcebergBoard(board=board, heatmap=heatmap_data)
+        iceberg_board = IcebergBoard(board=board, heatmap=heatmap_data, pre_defined_max=max_value)
         heatmap_images.append({'fen': fen, 'image': iceberg_board.render_to_base64()})
 
     return heatmap_images
