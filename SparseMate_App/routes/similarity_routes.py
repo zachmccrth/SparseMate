@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from ..utils.db_utils import get_features, get_tables
-from ..utils.model_utils import get_similar_features
+from ..utils.model_utils import get_similar_features, fetch_graph_data
 
 similarity_bp = Blueprint('model', __name__)
 

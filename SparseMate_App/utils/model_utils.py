@@ -78,18 +78,20 @@ def get_similar_features(table_name, feature_id):
         return None
 
 
-def fetch_graph_data(table_name, feature_id, threshold=0.5, max_neighbors=10):
+def fetch_graph_data(table_name, feature_id, threshold=0.1, max_neighbors=30, depth=0.5):
     """
-    Fetch graph data for the given table and feature_id.
+    Fetch graph data for the given table and feature_id as an undirected graph,
+    with distance information for each node.
 
     Arguments:
     table_name -- The name of the table (used for the projection matrix).
     feature_id -- The ID of the selected feature.
     threshold -- Minimum similarity score for linking nodes.
-    max_neighbors -- Maximum number of neighbors to fetch.
+    max_neighbors -- Maximum number of neighbors to fetch per node.
+    depth -- How many levels of neighbors to explore.
 
     Returns:
-    A dictionary with `nodes` and `edges`.
+    A dictionary with `nodes` (including distances) and `edges`.
     """
 
     projections = projections_cache_access(table_name)
@@ -97,18 +99,62 @@ def fetch_graph_data(table_name, feature_id, threshold=0.5, max_neighbors=10):
     if feature_id < 0 or feature_id >= projections.shape[0]:
         return None
 
-    # Node List: Include the main feature and the nearest neighbors
-    nodes = [{'id': int(feature_id), 'label': f'f{feature_id}'}]
-    edges = []
+    nodes = {}
+    edges = set()  # Ensure no duplicate edges
 
-    # Find top neighbors above threshold similarity
-    similarity_scores = projections[feature_id]
-    neighbor_indices = np.argsort(similarity_scores)[::-1][1:max_neighbors + 1]  # Skip self (top index)
+    # Use a queue to manage nodes we need to process
+    queue = [feature_id]  # Start with the initial feature at distance 0
+    visited = set()
 
-    for neighbor in neighbor_indices:
-        score = similarity_scores[neighbor]
-        if score >= threshold:
-            nodes.append({'id': int(neighbor), 'label': f'f{neighbor}'})
-            edges.append({'from': int(feature_id), 'to': int(neighbor), 'label': f"{score:.2f}"})
+    while queue:
+        current_node = queue.pop(0)
 
-    return {'nodes': nodes, 'edges': edges}
+        # Skip if we've already visited this node
+        if current_node in visited:
+            continue
+
+        visited.add(current_node)
+
+        current_distance = 1 - projections[int(feature_id)][int(current_node)]
+
+        # Add the current node with its distance to the graph
+        if current_node not in nodes:
+            nodes[current_node] = {
+                'id': int(current_node),
+                'label': f'f{current_node}',
+                'distance': current_distance # Include distance for coloring
+            }
+
+        # Stop if we've reached the maximum depth
+        if current_distance >= depth:
+            continue
+
+        # Find top neighbors above the threshold
+        similarity_scores = projections[current_node]
+        neighbor_indices = np.argsort(similarity_scores)[::-1][1:max_neighbors + 1]  # Skip self (top index)
+
+        for neighbor in neighbor_indices:
+            score = similarity_scores[neighbor]
+            if score >= threshold:
+                # Add the neighbor node if it doesn't already exist
+                if neighbor not in nodes:
+                    nodes[neighbor] = {
+                        'id': int(neighbor),
+                        'label': f'f{neighbor}',
+                        'distance': 1 - projections[feature_id][int(neighbor)]
+                    }
+
+                # Add the edge if not already added
+                edge = tuple(sorted((int(current_node), int(neighbor))))  # Undirected edge
+                if edge not in edges:
+                    edges.add(edge)
+
+                # Add the neighbor to the queue for deeper exploration
+                if neighbor not in visited:
+                    queue.append(neighbor)
+
+    # Convert nodes and edges to the required format
+    nodes_list = list(nodes.values())
+    edges_list = [{'from': edge[0], 'to': edge[1]} for edge in edges]  # Undirected edges
+
+    return {'nodes': nodes_list, 'edges': edges_list}
