@@ -37,9 +37,22 @@
             color: #555;
         }
     </style>
+     <!-- Include vis.js from CDN -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet" />
 </head>
 <body>
     <h1>Chess Feature Heatmaps</h1>
+
+      <!-- Expandable Graph Viewer -->
+    <div style="margin-bottom: 20px;">
+        <button onclick="toggleGraph()">Toggle Graph View</button>
+        <div id="graph-container" style="display: none; background: #f4f4f4; padding: 20px; border-radius: 8px;">
+            <h3>Feature Graph</h3>
+            <div id="network" style="height: 500px;"></div>
+        </div>
+    </div>
+
 
     <label for="tables">Select Table:</label>
     <select id="tables" onchange="updateFeatures()">
@@ -70,6 +83,139 @@
 
     <script>
 
+        function toggleGraph() {
+            const graphContainer = document.getElementById('graph-container');
+            const isHidden = graphContainer.style.display === 'none';
+
+            if (isHidden) {
+                graphContainer.style.display = 'block';
+                fetchGraphData(); // Load graph data when the container is shown
+            } else {
+                graphContainer.style.display = 'none';
+            }
+        }
+
+
+       async function fetchGraphData() {
+                const tableName = document.getElementById('tables').value;
+                const featureId = document.getElementById('features').value;
+
+                const response = await fetch('/graph_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table_name: tableName, feature_id: featureId })
+                });
+
+                if (!response.ok) {
+                    alert('Failed to fetch graph data');
+                    return;
+                }
+
+                const data = await response.json();
+                renderGraph(data); // Call graph rendering function
+            }
+
+    function renderGraph(data, currentFeatureId) {
+            const container = document.getElementById('network');
+
+            // Clear any existing graph data
+            container.innerHTML = '';
+
+            function getNodeColor(distance) {
+                const maxDistance = Math.max(...data.nodes.map(node => node.distance || 0)); // Safeguard for missing distances
+
+                if (maxDistance === 0) {
+                    // Fallback to bright orange if all nodes are at 0 distance
+                    return 'rgb(255, 165, 0)';
+                }
+
+                // Normalize distance to a range between 0 (close) and 1 (far)
+                let intensity = 1 - (distance / maxDistance);
+
+                // Ensure intensity is within a safe range
+                if (intensity < 0) intensity = 0;
+                if (intensity > 1) intensity = 1;
+
+                // Map intensity to a gradient: Yellow (close) → Orange → Red (far)
+                const red = Math.floor(255 * intensity);
+                const green = Math.floor(165 * intensity);
+                const blue = 0;
+
+                // Debugging: Print the distance, intensity, and final color
+                console.log(`Distance: ${distance}, Intensity: ${intensity}, Color: rgb(${red}, ${green}, ${blue})`);
+
+                return `rgb(${red}, ${green}, ${blue})`; // Return gradient color
+            }
+
+
+
+            // Highlight the current feature using distinct color
+            const nodes = new vis.DataSet(
+                data.nodes.map(node => {
+                    console.log("Node Data:", node); // Log each node
+
+                    if (node.id === parseInt(currentFeatureId)) {
+                        return {
+                            ...node,
+                            color: {
+                                background: '#FFD700', // Gold for the current feature
+                                border: '#FFB700'
+                            },
+                            font: { color: '#000000', size: 16, bold: true } // Highlighted font
+                        };
+                    }
+                    return {
+                        ...node,
+                        color: {
+                            background: getNodeColor(node.distance), // Color based on distance
+                            border: '#808080'                       // Default border color
+                        },
+                        font: { color: '#000000', size: 12, bold: false } // Default font
+                    };
+                })
+            );
+
+            const edges = new vis.DataSet(
+                data.edges.map(edge => ({
+                    from: edge.from,
+                    to: edge.to,
+                    color: { color: '#A9A9A9', opacity: 0.8 } // Gray edges
+                }))
+            );
+
+            const network = new vis.Network(container, { nodes, edges }, {
+                edges: {
+                    arrows: { to: { enabled: false } }, // Disable arrowheads for undirected graph
+                    smooth: false                      // Straight edges for less clutter
+                },
+                physics: {
+                    stabilization: true
+                }
+            });
+
+            // Event listener: On node click, update dropdown and re-render graph
+            network.on('click', function (params) {
+                if (params.nodes.length > 0) {
+                    const selectedNodeId = params.nodes[0]; // Get clicked node ID
+
+                    // Update dropdown to match selected node
+                    const featuresDropdown = document.getElementById('features');
+                    const featureOption = [...featuresDropdown.options].find(option => option.value == selectedNodeId);
+
+                    if (featureOption) {
+                        featuresDropdown.value = selectedNodeId;
+
+                        // Optionally trigger heatmap generation
+                        console.log(`Feature ID ${selectedNodeId} selected in dropdown.`);
+                        // Uncomment if auto-generation of heatmap is desired
+                        // generateHeatmap();
+
+                        // Re-render with updated selection
+                        renderGraph(data, selectedNodeId);
+                    }
+                }
+            });
+        }
     async function updateFeatures() {
         const tableName = document.getElementById('tables').value;
         const response = await fetch('/features', {
