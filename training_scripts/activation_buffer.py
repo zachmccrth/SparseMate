@@ -5,7 +5,7 @@ from my_datasets import DatasetsAPI
 
 class ActivationBuffer:
     """
-    A buffer to hold examined model activations for trainingdatasource: torch.utils.data.DataLoader[str]
+    A buffer to hold examined model activations for training
     """
     def __init__(self, dataset: torch.utils.data.Dataset, embedding_map: DataEmbeddingMap,
                  buffer_size: int, dtype = torch.float32, device ='cpu'):
