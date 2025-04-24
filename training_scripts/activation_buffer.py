@@ -7,14 +7,15 @@ class ActivationBuffer:
     """
     A buffer to hold examined model activations for training
     """
-    def __init__(self, dataset: torch.utils.data.Dataset, embedding_map: DataEmbeddingMap,
-                 buffer_size: int, dtype = torch.float32, device ='cpu'):
+    def __init__(self, dataset: torch.utils.data.Dataset, activations_generator: DataEmbeddingMap,
+                 buffer_size: int, device ='cpu', dtype = torch.float32):
         self.dataset = dataset
         # batch_size = None necessary to make sure that PyTorch doesn't call collate
-        self.datasource: torch.utils.data.DataLoader = torch.utils.data.DataLoader(chessbench_dataset, batch_size=None, batch_sampler=None)
+        self.datasource: torch.utils.data.DataLoader = torch.utils.data.DataLoader(chessbench_dataset,
+                                                                                   batch_size=None, batch_sampler=None)
         self.data_iter= iter(self.datasource)
-        self.embedding_map = embedding_map
-        self.buffer = torch.empty((buffer_size, embedding_map.activation_dimensions), dtype=dtype, device = device)
+        self.embedding_map = activations_generator
+        self.buffer = torch.empty((buffer_size, activations_generator.activation_dimensions), dtype=dtype, device = device)
         self.buffer_size_data = buffer_size
         self.dtype = dtype
         self.index = None

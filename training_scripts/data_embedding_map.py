@@ -7,7 +7,7 @@ from leela_interp.core.leela_board import LeelaBoard
 from loguru import logger
 from dotenv import load_dotenv
 import os
-
+from loguru import logger
 
 load_dotenv()
 

@@ -1,6 +1,7 @@
 import torch
 from tqdm import tqdm
 
+from training_scripts.activation_buffer import ActivationBuffer
 from training_scripts.train_event_logging import EventLogger, HasLoggableEvents, log_event
 
 
@@ -12,7 +13,7 @@ class TrainingLoop(HasLoggableEvents):
         Calling operations during training loop
         Device used in training
     """
-    def __init__(self, model, training_data, steps ,optimizer, scheduler, criterion, logger, device):
+    def __init__(self, model, training_data: ActivationBuffer, steps, batch_size ,optimizer, scheduler, criterion, logger, device):
         """
         model: model to train
         training_data: iterable training data
@@ -23,10 +24,11 @@ class TrainingLoop(HasLoggableEvents):
         """
         self.model = model
         self.training_data = training_data
+        self.TOTAL_STEPS = steps
+        self.batch_size = batch_size
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
-        self.TOTAL_STEPS = steps
         self.device = device
 
 
@@ -63,7 +65,7 @@ class TrainingLoop(HasLoggableEvents):
 
     def training_loop(self):
         for _ in tqdm(range(self.TOTAL_STEPS), total=self.TOTAL_STEPS, desc="Training"):
-            activations = next(self.training_data)
+            activations = self.training_data.load_next_data(self.batch_size)
             loss = self._training_step(activations)
 
 

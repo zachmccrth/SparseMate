@@ -566,13 +566,13 @@ class JumpReLU(Dictionary, nn.Module):
 
 class GOGS(Dictionary, nn.Module):
 
-    def __init__(self, basis_size: int, embedding_dimensions: int, device, dtype = torch.float32, layers = 6, *args, **kwargs):
+    def __init__(self, basis_size: int, embedding_dimensions: int, device, dtype = torch.float32, iterations = 6, *args, **kwargs):
         super().__init__(*args, **kwargs)
         B = torch.randn(basis_size, embedding_dimensions, device = device, dtype = dtype)
         B = B / B.norm(dim=1, keepdim=True)
         self.basis_set = torch.nn.Parameter(data=B, requires_grad=True)
 
-        self.layers = layers
+        self.iterations = iterations
         self.single_layer = DimensionReduction(self.basis_set)
 
 
@@ -588,7 +588,7 @@ class GOGS(Dictionary, nn.Module):
         return torch.matmul(f, self.basis_set.T)
 
     @classmethod
-    def from_pretrained(cls, path, device=None) -> Dictionary:
+    def from_pretrained(cls, path, device=None, **kwargs) -> Dictionary:
         state_dict = t.load(path, weights_only=True)
         basis_size, embedding_dimensions = state_dict["basis_set"].shape
         autoencoder = cls(basis_size, embedding_dimensions, device)
