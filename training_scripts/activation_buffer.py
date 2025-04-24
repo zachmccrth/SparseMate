@@ -11,7 +11,7 @@ class ActivationBuffer:
                  buffer_size: int, device ='cpu', dtype = torch.float32):
         self.dataset = dataset
         # batch_size = None necessary to make sure that PyTorch doesn't call collate
-        self.datasource: torch.utils.data.DataLoader = torch.utils.data.DataLoader(chessbench_dataset,
+        self.datasource: torch.utils.data.DataLoader = torch.utils.data.DataLoader(dataset=self.dataset,
                                                                                    batch_size=None, batch_sampler=None)
         self.data_iter= iter(self.datasource)
         self.embedding_map = activations_generator
@@ -48,6 +48,6 @@ class ActivationBuffer:
 if __name__ == '__main__':
     chessbench_dataset = DatasetsAPI.get("ChessBenchDataset")
     embedding_map = TruncatedLeelaDataEmbeddingMap(2)
-    buffer = ActivationBuffer(chessbench_dataset, embedding_map, 10)
+    buffer = ActivationBuffer(dataset=chessbench_dataset,activations_generator=embedding_map,buffer_size=10)
     for i in range(12):
         print(buffer.load_next_data(2))

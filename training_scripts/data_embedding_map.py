@@ -10,7 +10,6 @@ import os
 
 load_dotenv()
 
-
 class DataEmbeddingMap(ABC):
     """
     An abstract class representing a map from the input data to the model activations
@@ -130,11 +129,9 @@ class TruncatedLeelaDataEmbeddingMap(DataEmbeddingMap):
         return None
 
     def convert_to_input(self, board: LeelaBoard) -> torch.Tensor:
-        logger.debug(f"Converting board state to tensor input.")
         return torch.tensor(board.lcz_features(), device=self.device).unsqueeze(0).to(self.dtype)
 
     def convert_list_to_input(self, boards: List[LeelaBoard]) -> torch.Tensor:
-        logger.debug(f"Converting list of board states to tensor input.")
         return torch.concatenate([self.convert_to_input(board) for board in boards], dim=0)
 
     def embed_data(self, data) -> torch.Tensor:

@@ -12,9 +12,9 @@ class EventLogger(Protocol):
 
 
 class TensorboardEventLogger(EventLogger):
-    def __init__(self, log_dir: str):
+    def __init__(self, save_dir: str):
         from torch.utils.tensorboard import SummaryWriter
-        self.logger: SummaryWriter = SummaryWriter(log_dir)
+        self.logger: SummaryWriter = SummaryWriter(save_dir)
 
     def log_event(self, result: Any, tag: str, step: int) -> None:
         if isinstance(result, Number):

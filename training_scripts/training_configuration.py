@@ -38,7 +38,7 @@ def load_training_config(training_config_name: str = None, training_config_dir: 
             'buffer_size': 1000,
             'batch_size': 4096,
             'layers': 6,
-            'device': torch.device("cuda"),
+            'device': torch.device("cuda" if torch.cuda.is_available() else "cpu"),
             'dtype': torch.float32,
         }
 

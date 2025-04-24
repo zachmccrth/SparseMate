@@ -35,12 +35,20 @@ if __name__ == '__main__':
         dtype=training_config['dtype'],
     )
 
+    model = training_config['model'](
+        basis_size=training_config['basis_size'],
+        embedding_dimensions=training_config['embedding_size'],
+        iterations=training_config['layers'],
+        device=training_config['device'],
+        dtype=training_config['dtype'],
+   )
+
     training_loop = TrainingLoop(
-        model=training_config['model'](),
+        model=model,
         training_data=activations_buffer,
         steps=training_config['steps'],
         batch_size=training_config['batch_size'],
-        optimizer=training_config['optimizer'](lr=training_config['lr']),
+        optimizer=training_config['optimizer'](params=model.parameters(), lr=training_config['lr']),
         scheduler=None,
         criterion=training_config['criterion'](),
         logger=training_config['logger'](save_dir=save_dir),
