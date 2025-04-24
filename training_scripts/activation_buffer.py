@@ -1,6 +1,7 @@
 import torch
 from data_embedding_map import DataEmbeddingMap, TruncatedLeelaDataEmbeddingMap
 from my_datasets import DatasetsAPI
+from loguru import logger
 
 
 class ActivationBuffer:
@@ -31,14 +32,14 @@ class ActivationBuffer:
         input_data =self.embedding_map.convert_list_to_input([next(self.data_iter) for _ in range(self.buffer_size_data)])
         input_data = input_data.to(dtype=self.dtype, device=self.device)
         self.buffer = self.embedding_map.embed_data(input_data)
+        logger.debug(f"Buffer filled with {self.buffer.shape} samples")
         self.index = 0
-
 
     def load_next_data(self, n_samples) -> torch.Tensor:
         """
         Loads n samples from the buffer, reloading if necessary
         """
-        if self.buffer_size_data < (self.index + n_samples):
+        if self.buffer.size(dim=0) < (self.index + n_samples):
             overflow = self.index + n_samples - self.buffer_size_data
             first_part = self.load_next_data(n_samples - overflow)
             self._fill_buffer()

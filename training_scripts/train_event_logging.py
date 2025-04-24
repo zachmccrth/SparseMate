@@ -24,10 +24,6 @@ class TensorboardEventLogger(EventLogger):
             for key, val in result.items():
                 if isinstance(val, Number):
                     self.logger.add_scalar(f"{tag}/{key}", val, step)
-                # TODO: Extend for other types
-
-        elif hasattr(result, "log") and callable(getattr(result, "log")):
-            result.log(self, tag, step)
 
         else:
             raise TypeError(f"Unsupported event type: {type(result)}")

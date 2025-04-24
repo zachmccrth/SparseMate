@@ -577,7 +577,7 @@ class GOGS(Dictionary, nn.Module):
 
 
     def forward(self, embeddings: torch.Tensor):
-        for i in range (self.layers):
+        for i in range (self.iterations):
             embeddings = self.single_layer(embeddings)
         return embeddings
 

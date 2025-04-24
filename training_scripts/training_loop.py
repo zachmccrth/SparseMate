@@ -61,12 +61,21 @@ class TrainingLoop(HasLoggableEvents):
 
         self._step += 1
 
-        return loss
+        return loss.item()
 
-    def training_loop(self):
-        for _ in tqdm(range(self.TOTAL_STEPS), total=self.TOTAL_STEPS, desc="Training"):
+    def run(self):
+        total_tokens = self.batch_size * self.TOTAL_STEPS
+
+        progress_bar = tqdm(total=total_tokens, desc="Training", unit="tokens")
+
+        for _ in range(self.TOTAL_STEPS):
             activations = self.training_data.load_next_data(self.batch_size)
             loss = self._training_step(activations)
+
+            progress_bar.update(self.batch_size)
+        progress_bar.close()
+        return self.model
+
 
 
 

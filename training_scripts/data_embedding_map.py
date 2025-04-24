@@ -136,7 +136,6 @@ class TruncatedLeelaDataEmbeddingMap(DataEmbeddingMap):
         return torch.concatenate([self.convert_to_input(board) for board in boards], dim=0)
 
     def embed_data(self, data) -> torch.Tensor:
-        logger.debug(f"Embedding data with loaded submodule.")
         with torch.no_grad():
             return self.submodule(data)
 

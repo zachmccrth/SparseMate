@@ -76,9 +76,9 @@ if __name__ == '__main__':
         "lm_name": "leela",
         "run_name": run_name,
         "device": str(device),
-        "lr": 5e-4,
-        "dtype": torch.float32,
-        "layers": 6,
+        "lr": 5e-3,
+        "dtype": torch.float16,
+        "layers": 2,
         "submodule_name": "TruncatedModel",
     }
 
