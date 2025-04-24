@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from dictionary_learning.dictionary import GOGS
 from my_datasets.datasets_data.chessbench.bag_data import ChessBenchDataset
 from training_scripts.activation_buffer import ActivationBuffer
+from training_scripts.criterion import ResidualNorm
 from training_scripts.data_embedding_map import TruncatedLeelaDataEmbeddingMap
 from training_scripts.train_event_logging import TensorboardEventLogger
 
@@ -26,18 +27,18 @@ def load_training_config(training_config_name: str = None, training_config_dir: 
             'model': GOGS,
             'basis_size': 4096,
             'embedding_size': 768,
-            'steps': 100_000,
+            'steps': 10_000,
             'activations_generator': TruncatedLeelaDataEmbeddingMap,
             'dataset': ChessBenchDataset,
             'activations_buffer': ActivationBuffer,
             'optimizer': torch.optim.Adam,
             'scheduler': torch.optim.lr_scheduler.StepLR,
-            'criterion': torch.nn.MSELoss,
+            'criterion': ResidualNorm,
             'logger': TensorboardEventLogger,
-            'lr': 5e-4,
+            'lr': 1e-3,
             'buffer_size': 1000,
-            'batch_size': 4096,
-            'layers': 6,
+            'batch_size': 1024 ,
+            'layers': 7,
             'device': torch.device("cuda" if torch.cuda.is_available() else "cpu"),
             'dtype': torch.float32,
         }

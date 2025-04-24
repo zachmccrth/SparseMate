@@ -51,8 +51,8 @@ class TrainingLoop(HasLoggableEvents):
         activations = activations.to(self.device)
 
         self.optimizer.zero_grad()
-        sparse_reconstruction = self.model(activations)
-        loss = self.criterion(sparse_reconstruction, activations)
+        residuals = self.model(activations)
+        loss = self.criterion(residuals, activations)
 
         loss.backward()
         self.optimizer.step()

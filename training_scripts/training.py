@@ -50,6 +50,9 @@ def initialize_training(training_config):
     return training_loop
 
 
+
+
+
 if __name__ == '__main__':
     load_dotenv()
 
@@ -60,7 +63,7 @@ if __name__ == '__main__':
 
     save_dir = training_config.get('save_dir')
     if not save_dir:
-        run_name = f"{datetime.now().strftime('%m%d_%H:%M')}_{training_config['model'].__class__.__name__}"
+        run_name = f"{datetime.now().strftime('%m%d_%H:%M')}_{training_config['model'].__name__}"
         save_dir = os.path.join(os.getenv("RUNS_DIR"), run_name)
         training_config['save_dir'] = save_dir
     os.makedirs(save_dir)

@@ -589,10 +589,7 @@ class GOGS(Dictionary, nn.Module):
 
     @classmethod
     def from_pretrained(cls, path, device=None, **kwargs) -> Dictionary:
-        state_dict = t.load(path, weights_only=True)
-        basis_size, embedding_dimensions = state_dict["basis_set"].shape
-        autoencoder = cls(basis_size, embedding_dimensions, device)
-        autoencoder.load_state_dict(state_dict)
+        autoencoder = t.load(path, weights_only=False)
         return autoencoder
 
 
