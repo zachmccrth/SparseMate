@@ -49,6 +49,9 @@ class HasLoggableEvents(ABC):
 F = TypeVar("F", bound=Callable[..., Any])
 
 def log_event(tag: str | None = None) -> Callable[[F], F]:
+    """
+    Wrapper that takes the result of a function and logs it using the logger.
+    """
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(self: HasLoggableEvents, *args: Any, **kwargs: Any) -> Any:

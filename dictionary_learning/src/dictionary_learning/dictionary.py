@@ -572,7 +572,6 @@ class GOGS(Dictionary, nn.Module):
         B = B / B.norm(dim=1, keepdim=True)
         self.basis_set = torch.nn.Parameter(data=B, requires_grad=True)
 
-        print(f"GOGS initialized on {device}, with dtype={dtype}")
         self.layers = layers
         self.single_layer = DimensionReduction(self.basis_set)
 
