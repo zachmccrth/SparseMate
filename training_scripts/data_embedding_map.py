@@ -73,6 +73,7 @@ class TruncatedLeelaDataEmbeddingMap(DataEmbeddingMap):
             logger.info("Model successfully built and saved to cache.")
         else:
             logger.info("Model successfully loaded from cache.")
+        model = model.to(device=self.device, dtype=self.dtype)
         return model
 
     def _save_to_cache(self, model) -> None:

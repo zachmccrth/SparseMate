@@ -17,6 +17,7 @@ class ActivationBuffer:
         self.embedding_map = activations_generator
         self.buffer = torch.empty((buffer_size, activations_generator.activation_dimensions), dtype=dtype, device = device)
         self.buffer_size_data = buffer_size
+        self.device = device
         self.dtype = dtype
         self.index = None
 
@@ -28,6 +29,7 @@ class ActivationBuffer:
         Reset and refill the buffer
         """
         input_data =self.embedding_map.convert_list_to_input([next(self.data_iter) for _ in range(self.buffer_size_data)])
+        input_data = input_data.to(dtype=self.dtype, device=self.device)
         self.buffer = self.embedding_map.embed_data(input_data)
         self.index = 0
 
