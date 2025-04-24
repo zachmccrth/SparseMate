@@ -3,7 +3,6 @@ from data_embedding_map import DataEmbeddingMap, TruncatedLeelaDataEmbeddingMap
 from my_datasets import DatasetsAPI
 from loguru import logger
 
-
 class ActivationBuffer:
     """
     A buffer to hold examined model activations for training
@@ -39,8 +38,8 @@ class ActivationBuffer:
         """
         Loads n samples from the buffer, reloading if necessary
         """
-        if self.buffer.size(dim=0) < (self.index + n_samples):
-            overflow = self.index + n_samples - self.buffer_size_data
+        if self.buffer.size(dim=0) - 1 < (self.index + n_samples):
+            overflow = (self.index + 1) + n_samples - self.buffer.size(dim=0)
             first_part = self.load_next_data(n_samples - overflow)
             self._fill_buffer()
             return torch.concatenate((first_part, self.load_next_data(overflow)), dim=0)
