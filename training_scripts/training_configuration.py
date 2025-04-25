@@ -25,7 +25,7 @@ def load_training_config(training_config_name: str = None, training_config_dir: 
     if not training_config:
         training_config = {
             'model': GOGS,
-            'basis_size': 4096,
+            'basis_size': 8192,
             'embedding_size': 768,
             'steps': 10_000,
             'activations_generator': TruncatedLeelaDataEmbeddingMap,
@@ -38,7 +38,8 @@ def load_training_config(training_config_name: str = None, training_config_dir: 
             'lr': 1e-3,
             'buffer_size': 1000,
             'batch_size': 1024 ,
-            'layers': 7,
+            'layers': 8,
+            'iterations': 7,
             'device': torch.device("cuda" if torch.cuda.is_available() else "cpu"),
             'dtype': torch.float32,
         }

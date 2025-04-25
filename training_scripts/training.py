@@ -31,7 +31,7 @@ def initialize_training(training_config):
     model = training_config['model'](
         basis_size=training_config['basis_size'],
         embedding_dimensions=training_config['embedding_size'],
-        iterations=training_config['layers'],
+        iterations=training_config['iterations'],
         device=training_config['device'],
         dtype=training_config['dtype'],
     )
