@@ -574,12 +574,12 @@ class GOGS(Dictionary, nn.Module):
         self.basis_size = basis_size
 
         print(f"GOGS initialized on {device}, with dtype={dtype}")
-        self.layers = iterations
+        self.iterations = iterations
         self.single_layer = DimensionReduction(self.basis_set)
 
 
     def forward(self, embeddings: torch.Tensor):
-        for i in range (self.layers):
+        for i in range (self.iterations):
             embeddings = self.single_layer(embeddings)
         return embeddings
 
