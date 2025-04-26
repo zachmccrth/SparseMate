@@ -624,7 +624,7 @@ class GOGS2(GOGS):
 
     def encode(self, x) -> torch.Tensor:
         features_encoding = torch.zeros(x.shape[0], self.basis_size, device = x.device, dtype = x.dtype)
-        gram_matrix = torch.matmul(self.basis_set.T, self.basis_set)
+        gram_matrix = torch.matmul(self.basis_set, self.basis_set.T)
         dot_products = torch.matmul(x, self.basis_set.T)
 
 
