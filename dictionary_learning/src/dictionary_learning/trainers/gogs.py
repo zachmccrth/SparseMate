@@ -44,7 +44,7 @@ class GOGSTrainer(nn.Module, SAETrainer):
         residual = self.ae(x)
         recon_loss = residual.pow(2).sum(dim=-1).mean()
         row_norms = self.ae.basis_set.norm(dim=1)
-        l2_penalty = ((row_norms - 1.0) ** 2).mean() * 10000
+        l2_penalty = ((row_norms - 1.0) ** 2).mean() * 100
         total_loss = recon_loss + l2_penalty
 
         log_dict = {
