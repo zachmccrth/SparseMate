@@ -610,6 +610,33 @@ class DimensionReduction(torch.nn.Module):
         return residuals - projections
 
 
+class GOGS2(GOGS):
+
+    def __init__(self, basis_size: int, embedding_dimensions: int, device, dtype=torch.float32, iterations=6, *args,
+                 **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # rows of self.basis are basis vectors here
+
+    def forward(self, embeddings: torch.Tensor):
+        return embeddings - self.decode(self.encode(embeddings))
+
+    def encode(self, x) -> torch.Tensor:
+        features_encoding = torch.zeros(x.shape[0], self.basis_size, device = x.device, dtype = x.dtype)
+        gram_matrix = torch.matmul(self.basis_set.T, self.basis)
+        dot_products = torch.matmul(x, self.basis.T)
+
+        for i in range(self.iterations):
+            scales, best_vector_idx = torch.max(dot_products, dim=1)
+            interaction_vector = gram_matrix[best_vector_idx, :]
+            features_encoding[range(len(features_encoding)), best_vector_idx] = scales
+            dot_products = dot_products - scales * interaction_vector
+
+        return features_encoding
+
+    def decode(self, f) -> torch.Tensor:
+        return torch.matmul(f, self.basis_set.T)
+
 
 
 
