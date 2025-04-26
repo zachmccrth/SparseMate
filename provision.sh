@@ -52,6 +52,11 @@ done
 echo "Ensuring all dependencies are installed..."
 poetry install
 
+# Weird bug where nnsight isn't present
+echo "Attempting to add nnsight"
+poetry add nnsight
+echo "Successfully added nnsight"
+
 # --- 8. Install WandB and Huggingface CLI ---
 echo "Installing wandb and huggingface-cli..."
 poetry run pip install wandb huggingface_hub
