@@ -20,7 +20,7 @@ poetry --version
 # --- 3. Set up SSH deploy key ---
 echo "Setting up SSH key for Git access..."
 mkdir -p ~/.ssh
-echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa
+echo "$DEPLOY" | base64 -d > ~/.ssh/id_rsa
 chmod 600 ~/.ssh/id_rsa
 # Add github to known hosts to avoid authenticity prompts
 ssh-keyscan github.com >> ~/.ssh/known_hosts
@@ -72,6 +72,5 @@ poetry run huggingface-cli login --token "$HF_TOKEN"
 
 #Automatically activate poetry environment
 source "$(poetry env info --path)/bin/activate"
-
 
 echo "Setup complete"
