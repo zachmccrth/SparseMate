@@ -65,4 +65,8 @@ poetry run wandb login --relogin "$WANDB_API_KEY"
 # For Huggingface: the environment variable HUGGINGFACE_TOKEN must be set
 poetry run huggingface-cli login --token "$HUGGINGFACE_TOKEN"
 
+#Automatically activate poetry environment
+source "$(poetry env info --path)/bin/activate"
+
+
 echo "Setup complete"
