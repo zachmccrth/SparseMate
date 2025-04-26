@@ -20,7 +20,9 @@ poetry --version
 # --- 3. Set up SSH deploy key ---
 echo "Setting up SSH key for Git access..."
 mkdir -p ~/.ssh
-echo "$DEPLOY" | base64 -d > ~/.ssh/id_rsa
+# Prompt user
+echo "Paste your private key here, followed by EOF (Ctrl+D):"
+cat base64 -d > ~/.ssh/id_rsa
 chmod 600 ~/.ssh/id_rsa
 # Add github to known hosts to avoid authenticity prompts
 ssh-keyscan github.com >> ~/.ssh/known_hosts
