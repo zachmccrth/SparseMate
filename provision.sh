@@ -17,15 +17,17 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 # Verify poetry installation
 poetry --version
 
-# --- 3. Set up SSH deploy key ---
+# --- 1. Set up SSH key for Git access ---
 echo "Setting up SSH key for Git access..."
 mkdir -p ~/.ssh
+
 # Prompt user
-echo "Paste your private key here, followed by EOF (Ctrl+D):"base64 -
+echo "Paste your private key here, then press Ctrl+D:"
 cat | base64 -d > ~/.ssh/id_rsa
+
 chmod 600 ~/.ssh/id_rsa
-# Add github to known hosts to avoid authenticity promptsbase64 -
 ssh-keyscan github.com >> ~/.ssh/known_hosts
+
 
 # --- 4. Clone main project ---
 echo "Cloning main repository..."
