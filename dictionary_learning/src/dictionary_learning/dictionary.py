@@ -636,7 +636,6 @@ class GOGS2(GOGS):
             dot_products = dot_products - scales.unsqueeze(1) * interaction_vector
 
         return features_encoding
-features_encoding[range(len(features_encoding)), best_vector_idx] = scales
     def decode(self, f) -> torch.Tensor:
         return torch.matmul(f, self.basis_set.T)
 
