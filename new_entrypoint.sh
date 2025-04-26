@@ -13,5 +13,3 @@ chmod +x /root/provision.sh
 echo "Provisioning script downloaded to /root/provision.sh"
 echo "When ready, run: bash /root/provision.sh"
 
-# Keep container alive waiting for you
-tail -f /dev/null
