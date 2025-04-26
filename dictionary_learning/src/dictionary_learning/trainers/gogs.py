@@ -1,7 +1,7 @@
 from collections import namedtuple
 from torch import nn
 from dictionary_learning.trainers.trainer import SAETrainer
-from ..dictionary import GOGS
+from ..dictionary import GOGS, GOGS2
 import torch
 
 
@@ -16,7 +16,7 @@ class GOGSTrainer(nn.Module, SAETrainer):
         dict_class=GOGS,
         lr: float = 1e-4,
         device: str = "cpu",
-        run_name: str = "GOGS",
+        run_name: str = "GOGS2",
         dtype: torch.dtype = torch.float16,
         layers: int = 6,
         *args,
@@ -33,7 +33,7 @@ class GOGSTrainer(nn.Module, SAETrainer):
         self.lr = lr
         self.device = device
         self.run_name = run_name
-        self.ae = GOGS(basis_size=dict_size, embedding_dimensions=activation_dim, device=device, dtype=dtype, layers=layers)
+        self.ae = GOGS2(basis_size=dict_size, embedding_dimensions=activation_dim, device=device, dtype=dtype, layers=layers)
         # self.loss = torch.nn.MSELoss()
         self.logging_parameters = []
         self.optimizer = torch.optim.Adam(self.ae.parameters(), lr=lr)
@@ -81,7 +81,7 @@ class GOGSTrainer(nn.Module, SAETrainer):
     def config(self):
         return {
             "trainer_class": "GOGSTrainer",
-            "dict_class": "GOGS",
+            "dict_class": "GOGS2",
             "lr": self.lr,
             "steps": self.steps,
             "activation_dim": self.activation_dim,

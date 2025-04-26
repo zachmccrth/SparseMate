@@ -23,7 +23,7 @@ if __name__ == '__main__':
     dataset_class = ChessBenchDataset
     # Train the SAE
     trainer_class = GOGSTrainer
-    autoencoder_class = GOGS
+    autoencoder_class = GOGS2
 
     tokens_per_step = 2**12
     boards_to_train_on = 400_000
