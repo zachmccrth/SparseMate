@@ -571,6 +571,7 @@ class GOGS(Dictionary, nn.Module):
         B = torch.randn(basis_size, embedding_dimensions, device = device, dtype = dtype)
         B = B / B.norm(dim=1, keepdim=True)
         self.basis_set = torch.nn.Parameter(data=B, requires_grad=True)
+        self.basis_size = basis_size
 
         print(f"GOGS initialized on {device}, with dtype={dtype}")
         self.layers = layers
