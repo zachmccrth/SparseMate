@@ -627,14 +627,12 @@ class GOGS2(GOGS):
         gram_matrix = torch.matmul(self.basis_set.T, self.basis_set)
         dot_products = torch.matmul(x, self.basis_set.T)
 
-        print(self.basis_set.T)
-        print(self.basis_size)
-        print(self.basis_set.shape)
 
         for i in range(self.iterations):
             scales, best_vector_idx = torch.max(dot_products, dim=1)
             interaction_vector = gram_matrix[best_vector_idx, :]
-            print(interaction_vector.shape)
+            print(f"Feature Vector Shape {features_encoding.shape}")
+            print(f"Interaction Vector Shape {interaction_vector.shape}")
             features_encoding[torch.arange(len(features_encoding), device=x.device), best_vector_idx] = scales
             dot_products = dot_products - scales.unsqueeze(1) * interaction_vector
 
