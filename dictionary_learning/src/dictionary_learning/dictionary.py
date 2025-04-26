@@ -566,7 +566,7 @@ class JumpReLU(Dictionary, nn.Module):
 
 class GOGS(Dictionary, nn.Module):
 
-    def __init__(self, basis_size: int, embedding_dimensions: int, device, dtype = torch.float32, layers = 6, *args, **kwargs):
+    def __init__(self, basis_size: int, embedding_dimensions: int, device, dtype = torch.float32, iterations = 6, *args, **kwargs):
         super().__init__(*args, **kwargs)
         B = torch.randn(basis_size, embedding_dimensions, device = device, dtype = dtype)
         B = B / B.norm(dim=1, keepdim=True)
@@ -574,7 +574,7 @@ class GOGS(Dictionary, nn.Module):
         self.basis_size = basis_size
 
         print(f"GOGS initialized on {device}, with dtype={dtype}")
-        self.layers = layers
+        self.layers = iterations
         self.single_layer = DimensionReduction(self.basis_set)
 
 
