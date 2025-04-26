@@ -627,11 +627,10 @@ class GOGS2(GOGS):
         gram_matrix = torch.matmul(self.basis_set.T, self.basis_set)
         dot_products = torch.matmul(x, self.basis_set.T)
 
+        print(self.basis_set.T)
+        print(self.basis_set.shape)
+
         for i in range(self.iterations):
-            if torch.isnan(dot_products).any():
-                raise ValueError("dot_products contains NaNs before calling torch.max!")
-            if not torch.isfinite(dot_products).all():
-                raise ValueError("dot_products contains infs before calling torch.max!")
             scales, best_vector_idx = torch.max(dot_products, dim=1)
             interaction_vector = gram_matrix[best_vector_idx, :]
             print(features_encoding.shape)
